@@ -1,12 +1,12 @@
 ---
 name: animation-studio
-description: This skill should be used when the user asks to "make an animated video about X with music", "make a cartoon / animated short", "animate this story", "make a video like the Opus animations", or "make an explainer animation" — a new hand-drawn 2D film where every frame is drawn in code and the soundtrack is synthesized in code, synced from one score, delivered as a 1080p MP4. Not for CSS/web/UI animation, Lottie/SVG/GIF assets, editing or adding music to an existing video, or Remotion/Manim projects.
-version: 0.3.0
+description: This skill should be used when the user asks to "make an animated video about X with music", "make a cartoon / animated short", "animate this story", "make a video like the Opus animations", "make an explainer animation", "make a promo video for my app / brand", or "make an animated Reel / TikTok / Short" — a new hand-drawn 2D film where every frame is drawn in code and the soundtrack is synthesized in code, synced from one score, delivered as a 1080p MP4 in 16:9, 9:16, 1:1 or 4:5. Not for CSS/web/UI animation, Lottie/SVG/GIF assets, editing or adding music to an existing video, or Remotion/Manim projects.
+version: 0.4.0
 ---
 
 # Animation Studio
 
-Make short films (typically 20–60s, 1920×1080, 30fps) where **every frame is drawn on a canvas and every sound is synthesized in JavaScript**. There are no samples, no stock footage and no npm dependencies. The signature trick is one `score.js` timeline that both the music and the animation read, so they cannot drift apart. Each ball touch plays a note, each letter stamps on an 8th note, and each firework bursts on the clap.
+Make short films (typically 15–60s at 30fps, in 16:9, 9:16, 1:1 or 4:5) where **every frame is drawn on a canvas and every sound is synthesized in JavaScript**. There are no samples, no stock footage and no npm dependencies. The signature trick is one `score.js` timeline that both the music and the animation read, so they cannot drift apart. Each ball touch plays a note, each letter stamps on an 8th note, and each firework bursts on the clap.
 
 Requirements: Node 22+ (built-in WebSocket), ffmpeg, Google Chrome/Chromium (headless). No `npm install`. Supported on macOS and Linux.
 
@@ -31,7 +31,8 @@ From the request, or with at most one round of questions, settle:
 - the subject and the emotional arc,
 - the length (default 20–40s),
 - who appears, including exact name spellings for jerseys and signatures,
-- whether the Claude mascot belongs (yes for Opus-style or Claude films; otherwise optional).
+- whether the Claude mascot belongs (yes for Opus-style or Claude films; otherwise optional),
+- where it will be posted: 16:9 for YouTube/X/presentations, **9:16 for Reels, TikTok and Shorts**, 1:1 or 4:5 for feeds. Ask if a brand/product/social brief doesn't say.
 
 Characters are never fixed. Use a preset (`Ch.STYLES.afaq`, `Ch.STYLES.afaqFan`), customize `Ch.person` (hair, facial hair, glasses, outfit, build, colours), or build new characters (pets, robots, products) from `G.*` primitives. The cat in `examples/characters/cat.js` is the worked example. When the user shares a photo of someone to feature, translate it into `style` options and never store the photo. Real images the user provides can appear as taped prints via `G.photo`. See `references/custom-characters.md`.
 
@@ -61,11 +62,13 @@ node <skill-dir>/scripts/new-project.js <target-dir>
 
 If any preflight line shows ✗, stop. Tell the user what is missing and how to get it (e.g. `brew install ffmpeg`, Node 22+, or `CHROME_PATH=...` for a non-standard browser), and ask before installing anything.
 
-**Always start new stories from the template.** It uses the documented engine API (`MUSIC`, `MIX`, `Studio.film`). `examples/world-cup-2026/` is a 58s reference film that predates that API: it has its own `T()`/`m()`, its own mixer and its own `window.renderAt`, and its `index.html` loads neither `engine/music.js` nor `engine/video/boot.js`. Read it for drawing and staging patterns (living-room set, TV match, crowd, lighting, paper wipes, close-ups, freeze frame, impact frames, handwritten ending) and port them into the template structure. Never mix the two styles in one project. Scaffold it with `--from world-cup-2026` only to re-render or remix that exact film.
+Add `--format 9:16` (or `1:1`, `4:5`) for vertical or square films: the template lays itself out for any format. For a product, app or brand promo, start from `--from app-promo` instead: a 9:16 musical explainer built with the UI kit (phone mockup, app screens, chat, stats, end card) for a fictional app. Keep its structure, replace the brand, screens and story.
+
+**Always start new stories from the template (or app-promo).** Both use the documented engine API (`MUSIC`, `MIX`, `Studio.film`, `UI`). `examples/world-cup-2026/` is a 58s reference film that predates that API: it has its own `T()`/`m()`, its own mixer and its own `window.renderAt`, and its `index.html` loads neither `engine/music.js` nor `engine/video/boot.js`. Read it for drawing and staging patterns (living-room set, TV match, crowd, lighting, paper wipes, close-ups, freeze frame, impact frames, handwritten ending) and port them into the template structure. Never mix the two styles in one project. Scaffold it with `--from world-cup-2026` only to re-render or remix that exact film.
 
 ### 3. Write `score.js`
 
-Use `MUSIC.makeClock({ bpm, offset })` for `T(bar, beat)`, `placeBar` for 8th-note melody bars, and `makeChords` for harmony. Export `FPS`, `DURATION`, `S` (named sections, used by the level meter) and every event list. Any randomness (popcorn kernels, fireworks, crowd voices) is generated here with a seeded `U.mulberry32`, so the audio and the video see identical events. Keep the template's UMD wrapper and its last line (`if (node) module.exports = SCORE; else globalThis.SCORE = SCORE;`): `song.js` and `render.js` `require()` score.js, while `index.html` loads it as a script.
+Use `MUSIC.makeClock({ bpm, offset })` for `T(bar, beat)`, `placeBar` for 8th-note melody bars, and `makeChords` for harmony. Export `FPS`, `FORMAT` (`'16:9'` default, `'9:16'`, `'1:1'`, `'4:5'`), `DURATION`, `S` (named sections, used by the level meter and the storyboard labels) and every event list. Any randomness (popcorn kernels, fireworks, crowd voices) is generated here with a seeded `U.mulberry32`, so the audio and the video see identical events. Keep the template's UMD wrapper and its last line (`if (node) module.exports = SCORE; else globalThis.SCORE = SCORE;`): `song.js` and `render.js` `require()` score.js, while `index.html` loads it as a script.
 
 Name the key moments in a `markers` object and export it: `markers: { land: { t: ev.land, sync: 'av' }, drop: { t: ev.drop, sync: 'av' }, outro: ev.end }`. Every render command then accepts `@land`, `@drop-2` or `@drop+0.5` (and `8:2` for bar 8, beat 2) instead of raw seconds. Give `sync: 'av'` to the hits (landings, cuts, stamps, drops, flashes) so `render.js verify` measures them; `'a'` is sound only, `'v'` picture only. Moments without a hit (a slow fade, a silence) stay plain times.
 
@@ -80,6 +83,8 @@ For acoustic colour there are `I.guitar(midi, dur, {bright, sustain})` (a plucke
 ### 5. Write `film.js`
 
 Call `Studio.film({ draw(ctx, t) {...}, post, init })`. Every visual is a **pure function of t**, so any frame can render in any order on any worker. Build characters with `Ch.claude(ctx, {...})` (the orange block mascot: eyes, arms, squash/stretch, scarf, mouth) and `Ch.person(ctx, {..., style: {...}})` (see `references/custom-characters.md`). Pose people by hand targets, since arms use 2-bone IK. Draw everything with `G.*` so lines boil at 12fps and fills get pencil hatching; the key calls are `G.rrect/ellipse/poly/line/limb`, `G.caption`, `G.bubble`, `G.confetti`, `G.firework`, `G.star` and `G.rays`. Drive motion from the clock: `hop()` lands on beats, squash on the downbeat, cuts on bar lines. If the film grows beyond film.js, add each new file as a `<script>` after `engine/video/boot.js` in index.html. See `references/visual-style.md` and `references/engine-api.md`.
+
+Lay everything out from `G.W` / `G.H` (the score's format), never from hard-coded 1920×1080 numbers, and keep text, faces and logos inside `G.SAFE`. On 9:16 the platforms cover the top ~11%, the bottom ~22% and the right edge with their own UI. For products and brands, draw the app with the UI kit (`UI.phone`, `UI.card`, `UI.pill`, `UI.button`, `UI.chat`, `UI.stat`, `UI.check`, `UI.ring`, `UI.iris`) after `UI.setTheme({ accent, … })` with the brand's colours. Real-app UI goes in the clean system font inside the phone; the world around it stays hand-drawn. Use only facts and numbers the client confirms, and put a real logo in with `Studio.loadImage` + `UI.logo`.
 
 ### 6. Review like a director (loop until it's good)
 
@@ -107,7 +112,7 @@ cd <target-dir> && node engine/render.js verify     # sound + picture measured a
 
 ### 8. Deliver
 
-Report the output path, duration, resolution and size. Explain the sync gimmicks in one or two sentences. State plainly that the audio was verified by measurement rather than listening, and invite feedback on the sound. Offer variations: team/brand colours, names, a different length or tempo. Do not offer 9:16, because the engine is fixed at 1920×1080.
+Report the output path, duration, resolution and size. Explain the sync gimmicks in one or two sentences. State plainly that the audio was verified by measurement rather than listening, and invite feedback on the sound. Offer variations: team/brand colours, names, a different length or tempo, or another format (a 9:16 cut for Reels/TikTok/Shorts means re-laying out the shots, not cropping).
 
 ## Rules that prevent the usual failures
 
@@ -130,12 +135,13 @@ Report the output path, duration, resolution and size. Explain the sync gimmicks
 - **`references/review-and-gotchas.md`**: review commands, sync verification, known pitfalls and fixes
 
 ### Starting points
-- **`template/`** (start here): a 23s starter. Claude drops onto a paper stage and bounces on every beat. Each melody note pops a star, so the melody draws a constellation. Then a held breath, a sunburst drop and a handwritten ending.
+- **`template/`** (start here, any format): a 23s starter. Claude drops onto a paper stage and bounces on every beat. Each melody note pops a star, so the melody draws a constellation. Then a held breath, a sunburst drop and a handwritten ending.
+- **`examples/app-promo/`** (brand and app promos): a 20s 9:16 promo for "Pantrio", a fictional recipe app. A fridge opens on the downbeat, then four app steps, one bar each, each with its own gimmick: ingredients recognised on 8ths, recipe cards on beats, steps ticked off per beat, chat call-and-response on guitar vs e-piano. Then a held breath, the plate landing on the drop, stats, and a logo end card.
 - **`examples/characters/cat.js`**: a complete custom character (`Ch.cat`) built from primitives
 - **`examples/world-cup-2026/`** (patterns only, older API): the 58s film "Claude × Afaq, World Cup 2026". It covers a living room, a TV match where the ball plays the hook, tension with a heartbeat, strike and close-ups, a freeze, GOOOOOAL letters on 8ths, a party, a street chant, a high-five and an outro.
 
 ### Scripts
-- **`scripts/new-project.js`**: scaffold a project (engine + template) with a preflight check
+- **`scripts/new-project.js`**: scaffold a project (engine + template or example; `--format 9:16|1:1|4:5`, `--from app-promo`) with a preflight check
 - **`scripts/smoke-test.js`**: end-to-end engine check (true-peak limiter, render, mux, markers, board, clip, verify, a crashing ffmpeg, two renders in one folder); run it after changing the engine
 - **`engine/render.js`**: `stills | sheet | board | clip | video | mux | check | verify`; times as seconds, `bar:beat` or `@marker±sec`
 - **`engine/tools/levels.js`**: per-section RMS/peak meter for the mix and stems

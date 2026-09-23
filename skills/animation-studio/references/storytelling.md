@@ -65,6 +65,8 @@ A worked app promo (108 BPM, 18 bars, 42s; the user journey IS the story, and ea
 | 12 | the payoff scene, "We're going." | flash cut, full band, brass on the hook |
 | 13–15 | a calmer beat for a sensitive topic, a community moment, numbers stamped | drums drop out; then a brass stab per stat, rising |
 | 16–17 | logo, tagline word by word, the call to action | bells + a held maj9 chord; hold the end card ≥ 2 s at full brightness before the fade |
+`examples/app-promo/` is the compact 9:16 version of this (112 BPM, 8 bars, 20s): fridge → snap → recipes → cook → share → held breath → the plate lands → stats → logo.
+Short-form (Reels/TikTok/Shorts): 15–25s, motion on the very first downbeat, one idea per bar, captions as big numbered steps at the top of the safe area, and an end card that holds ≥ 2s.
 Brand films: use the brand's own colours and font in the UI (a clean system font inside the phone), keep the hand-drawn world around it, only use numbers the client confirms, and keep sacred or sensitive subjects respectful (no comedy, no depictions they would not approve).
 
 ## Sync gimmicks (the jaw-droppers)

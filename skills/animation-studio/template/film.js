@@ -4,8 +4,10 @@
   const U = globalThis.U, G = globalThis.G, Ch = globalThis.Ch, S = globalThis.SCORE, Studio = globalThis.Studio;
   const { BEAT, ev, clock } = S;
   const { clamp, lerp, ease, pulse } = U;
-  const W = G.W, H = G.H;
-  const GROUND = 860;
+  const W = G.W, H = G.H; // from the score's FORMAT: every position below is relative to them
+  const GROUND = Math.round((H * 860) / 1080);
+  const K = Math.min(W, H) / 1080; // character scale
+  const X = (x) => (x * W) / 1920; // an x designed on the 1920-wide stage
 
   const hop = (t, amp) => amp * Math.sin(Math.PI * clock.phase(t)); // 0 on every beat
   const squash = (t) => Math.max(0, 1 - clock.phase(t) * 5); // 1 right on the beat
@@ -26,13 +28,14 @@
       for (let i = 0; i < 24; i++) {
         ctx.fillStyle = i % 2 ? '#F2B84B' : '#E0703E';
         const a0 = (i / 24) * Math.PI * 2, a1 = ((i + 1) / 24) * Math.PI * 2;
-        ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(a0) * 2200, Math.sin(a0) * 2200); ctx.lineTo(Math.cos(a1) * 2200, Math.sin(a1) * 2200); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(0, 0); const R = 2200 * Math.max(1, H / 1080);
+        ctx.lineTo(Math.cos(a0) * R, Math.sin(a0) * R); ctx.lineTo(Math.cos(a1) * R, Math.sin(a1) * R); ctx.fill();
       }
       ctx.restore();
     }
     // paper hills + ground
-    G.poly(ctx, [[-50, GROUND - 40], [500, GROUND - 110], [1100, GROUND - 60], [1600, GROUND - 130], [1980, GROUND - 70], [1980, H + 50], [-50, H + 50]], { fill: '#3E8A6A', lw: 5, seed: 3, hatch: { color: 'rgba(0,0,0,0.15)', gap: 9 } });
-    G.poly(ctx, [[-50, GROUND], [1980, GROUND], [1980, H + 50], [-50, H + 50]], { fill: '#E8D9BC', lw: 5, seed: 4, hatch: { color: 'rgba(120,80,40,0.15)', gap: 8 } });
+    G.poly(ctx, [[X(-50), GROUND - 40], [X(500), GROUND - 110], [X(1100), GROUND - 60], [X(1600), GROUND - 130], [X(1980), GROUND - 70], [X(1980), H + 50], [X(-50), H + 50]], { fill: '#3E8A6A', lw: 5, seed: 3, hatch: { color: 'rgba(0,0,0,0.15)', gap: 9 } });
+    G.poly(ctx, [[X(-50), GROUND], [X(1980), GROUND], [X(1980), H + 50], [X(-50), H + 50]], { fill: '#E8D9BC', lw: 5, seed: 4, hatch: { color: 'rgba(120,80,40,0.15)', gap: 8 } });
   }
 
   function stars(ctx, t) {
@@ -60,7 +63,7 @@
 
   function claude(ctx, t) {
     if (t < ev.claudeFall) return;
-    const o = { x: 960, y: GROUND, s: 1.4, eyes: 'normal', scarf: false, blush: 0.4, armL: 0.2, armR: 0.2 };
+    const o = { x: W / 2, y: GROUND, s: 1.4 * K, eyes: 'normal', scarf: false, blush: 0.4, armL: 0.2, armR: 0.2 };
     if (t < ev.claudeLand) {
       const u = (t - ev.claudeFall) / (ev.claudeLand - ev.claudeFall);
       o.y = lerp(-200, GROUND, ease.inQuad(u)); o.sy = 1.2; o.sx = 0.88; o.eyes = 'wide'; o.armL = o.armR = 1.1;
@@ -69,7 +72,7 @@
       o.y = GROUND - hop(t, 70); o.sy = 1 - 0.22 * land; o.sx = 1 + 0.16 * land;
       o.eyes = 'happy';
       const last = [...S.starNotes].reverse().find((n) => n.t <= t);
-      if (last && t - last.t < 0.3) { o.eyes = 'wide'; o.look = clamp((last.x - 960) / 600, -1, 1); o.lookY = -1; }
+      if (last && t - last.t < 0.3) { o.eyes = 'wide'; o.look = clamp((last.x - W / 2) / X(600), -1, 1); o.lookY = -1; }
       o.armL = o.armR = 0.3 + 0.3 * hop(t, 1);
     } else if (t < ev.drop) {
       o.sy = 0.78; o.sx = 1.2; o.eyes = 'focus'; o.x += U.noise1(t * 40, 1) * 3; // held breath, crouched
@@ -91,7 +94,7 @@
     const size = 120;
     const full = e.words.map((w) => w.w).join(' ');
     let x = W / 2 - G.measure(ctx, full, size) / 2;
-    const y = 250;
+    const y = S.WIDE ? 250 : S.SAFE.y + 150;
     e.words.forEach((w, i) => {
       const ww = G.measure(ctx, w.w + (i < e.words.length - 1 ? ' ' : ''), size);
       const p = ease.inOutQuad(clamp((t - w.t) / w.d));
@@ -104,7 +107,7 @@
       x += ww;
     });
     const sa = clamp((t - e.sub.t) / 0.6);
-    if (sa > 0) G.text(ctx, e.sub.text, W / 2, 330, { size: 48, fam: 'Patrick Hand', weight: 400, color: '#E9DCC3', align: 'center', alpha: sa });
+    if (sa > 0) G.text(ctx, e.sub.text, W / 2, y + 80, { size: 48, fam: 'Patrick Hand', weight: 400, color: '#E9DCC3', align: 'center', alpha: sa });
   }
 
   Studio.film({

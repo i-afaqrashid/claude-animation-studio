@@ -8,6 +8,11 @@
   const { m, makeClock, placeBar, makeChords } = MU;
 
   const FPS = 30;
+  // '16:9' (YouTube, X), '9:16' (Reels / TikTok / Shorts), '1:1' or '4:5' (feeds). The film lays itself out for any.
+  const FORMAT = '16:9';
+  const [W, H] = U.formatSize(FORMAT);
+  const SAFE = U.safeArea(W, H); // keep captions and titles inside this box
+  const WIDE = W / H > 1.2;
   const clock = makeClock({ bpm: 120, offset: 0.5 }); // 120 BPM: 1 beat = 0.5s, 1 bar = 2s
   const { T, BEAT } = clock;
   const DURATION = T(10) + 2.5; // 23s
@@ -58,8 +63,8 @@
     .filter((n) => n.t < ev.breath - 1e-6)
     .map((n, i, all) => ({
       ...n, i,
-      x: U.remap(n.t, all[0].t, all[all.length - 1].t, 240, 1680),
-      y: U.remap(n.midi, m('G4'), m('F5'), 600, 190), // higher note = higher star
+      x: U.remap(n.t, all[0].t, all[all.length - 1].t, (W * 240) / 1920, (W * 1680) / 1920),
+      y: U.remap(n.midi, m('G4'), m('F5'), (H * 600) / 1080, (H * 190) / 1080), // higher note = higher star
     }));
   const brass = [...placeBar(clock, HOOK[1], 6), ...placeBar(clock, HOOK[2], 7), ...placeBar(clock, HOOK.end, 8), { t: T(9), dur: 2.5, midi: m('F5') }];
 
@@ -75,11 +80,11 @@
   };
 
   const captions = [
-    { t: T(0, 1), end: T(1, 3.5), text: 'a tiny film, made of code.', x: 140, y: 110, rot: -0.04, size: 60 },
-    { t: T(3, 0), end: T(5, 2.5), text: 'every star is a note.', x: 1180, y: 110, rot: 0.04, size: 56 },
+    { t: T(0, 1), end: T(1, 3.5), text: 'a tiny film, made of code.', x: WIDE ? 140 : SAFE.x + 20, y: WIDE ? 110 : SAFE.y + 20, rot: -0.04, size: 60 },
+    { t: T(3, 0), end: T(5, 2.5), text: 'every star is a note.', x: WIDE ? 1180 : SAFE.x + 20, y: WIDE ? 110 : SAFE.y + 20, rot: 0.04, size: 56 },
   ];
   const endText = { words: [{ w: 'made', t: T(9, 0), d: 0.45 }, { w: 'with', t: T(9, 1), d: 0.4 }, { w: 'code.', t: T(9, 2), d: 0.5 }], sub: { t: T(9, 2.6), text: '(the music too)' } };
 
-  const SCORE = { FPS, DURATION, clock, T, BEAT, S, m, chords, chordAt, HOOK, ev, markers, musicbox, starNotes, brass, captions, endText };
+  const SCORE = { FPS, FORMAT, W, H, SAFE, WIDE, DURATION, clock, T, BEAT, S, m, chords, chordAt, HOOK, ev, markers, musicbox, starNotes, brass, captions, endText };
   if (node) module.exports = SCORE; else globalThis.SCORE = SCORE;
 })();

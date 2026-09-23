@@ -102,6 +102,24 @@ function keys(t, ks) {
   return ks[ks.length - 1][1];
 }
 
-const U = { mulberry32, hash, noise1, clamp, lerp, invLerp, remap, smooth, ease, tween, springKick, pulse, keys };
+// ---------- frame formats ----------
+// 16:9 is the default. 9:16 = Reels / TikTok / Shorts, 1:1 = square feeds, 4:5 = Instagram feed.
+const FORMATS = { '16:9': [1920, 1080], '9:16': [1080, 1920], '1:1': [1080, 1080], '4:5': [1080, 1350] };
+function formatSize(f) {
+  if (Array.isArray(f)) return [2 * Math.round(f[0] / 2), 2 * Math.round(f[1] / 2)]; // H.264 needs even sizes
+  if (!f) return FORMATS['16:9'].slice();
+  if (!FORMATS[f]) throw new Error(`unknown FORMAT "${f}" (use ${Object.keys(FORMATS).join(', ')} or [width, height])`);
+  return FORMATS[f].slice();
+}
+// Where text, faces and logos stay visible. On tall (9:16) videos the platforms cover the top
+// (header), the bottom (caption, handle, audio) and the right edge (like/share buttons);
+// other formats keep a 5% margin.
+function safeArea(w, h) {
+  if (h > w * 1.5) return { x: 60, y: Math.round(h * 0.115), w: w - 200, h: Math.round(h * (1 - 0.115 - 0.22)) };
+  const m = Math.round(Math.min(w, h) * 0.05);
+  return { x: m, y: m, w: w - 2 * m, h: h - 2 * m };
+}
+
+const U = { mulberry32, hash, noise1, clamp, lerp, invLerp, remap, smooth, ease, tween, springKick, pulse, keys, FORMATS, formatSize, safeArea };
 if (typeof module !== 'undefined') module.exports = U; else globalThis.U = U;
 })();

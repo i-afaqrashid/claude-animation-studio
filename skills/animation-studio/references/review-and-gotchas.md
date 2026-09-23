@@ -12,11 +12,11 @@
 Give every hit a `sync` marker in `score.js`, then `node engine/render.js verify`:
 ```
 marker        score      sound                 picture
-snap          24.944s    24.944s +0ms ✓        25.000s +1f ✓
-flash         27.167s    27.167s +0ms ✓        27.167s +0f ✓
+snap          24.944s    24.944s +0ms ✓        24.967s +0f ✓
+flash         27.167s    27.167s +0ms ✓        27.200s +1f ✓
 ✓ in sync
 ```
-Reading it: sound ±20 ms and picture ±1 frame pass. The picture measures how unevenly a frame changes (fades and brightness drifts are subtracted), so cuts, flashes, stamps and pops stand out. It can land one frame off when motion accelerates INTO the hit (a lid slamming shut) or when the hit starts small (a pop growing from scale 0). ✗ = a real offset: move the event in `score.js` so both sides read the same time. `?` = no distinct hit near the marker (a small pop in a busy frame, a note buried in the mix): make the moment clearer, or give it `sync: 'a'` / `'v'` / no sync.
+Reading it: sound ±20 ms and picture ±1 frame pass. The picture counts the pixels that change a lot from one frame to the next, so cuts, flashes, stamps and pops stand out while fades and grain don't. It can land one frame late after a white flash (the flash frame differs less from a bright scene than the frame after it does) or one frame early when motion accelerates INTO the hit (a lid slamming shut). ✗ = a real offset: move the event in `score.js` so both sides read the same time. `?` = no distinct hit near the marker (a small pop in a busy frame, a note buried in the mix): make the moment clearer, or give it `sync: 'a'` / `'v'` / no sync.
 
 ## Performance
 - About 300ms per frame per worker for heavy scenes. 7 workers on 8 cores: a 58s film in ~7–8 min. Always run `video` with `run_in_background: true` (it exceeds the 2-minute Bash timeout).
@@ -51,6 +51,9 @@ Reading it: sound ±20 ms and picture ±1 frame pass. The picture measures how u
 | A new prop fades in on top of an object that is leaving | draw order | draw the leaving object last until it is gone |
 | An opening lid/door covers a character | pivot on the side facing the character | hinge it on the side facing empty space |
 | A flying prop crosses the caption | arc peak inside the caption's box | start props below the caption line or from a character's hand |
+| A 9:16 film has text under the platform's buttons/caption | laid out for the full frame | keep text, faces and logos inside `G.SAFE`; put ground/tables in the bottom 22% |
+| `verify` says a logo is 2 frames early after a circle wipe | the wipe's last frames change more pixels than a small logo popping in | close the wipe AT the marker and hard-cut to the end card there (`app-promo` does this) |
+| The status bar vanishes on a dark app screen | dark text on dark | `UI.phone(…, { dark: true })` for camera/dark screens |
 
 ## Etiquette on the user's machine
 - Never kill processes the renderer did not start (another session may be rendering), and never touch the user's dev servers or ports (e.g. 3000).

@@ -5,6 +5,7 @@
 //      and FAILS when a marker is 100 ms off
 //   3. an ffmpeg that crashes mid-stream makes the render FAIL cleanly (no hang, no leftover Chrome)
 //   4. a second render in the same project folder is refused while the first one still succeeds
+//   5. formats: --format 9:16 renders 1080x1920 frames; the app-promo example (UI kit) scores and draws
 // Usage: node <skill>/scripts/smoke-test.js        (takes ~2–4 minutes; needs Node 22+, ffmpeg, Chrome)
 const fs = require('fs');
 const os = require('os');
@@ -104,6 +105,21 @@ const probe = (file) => JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-sho
   const firstCode = await new Promise((r) => first.on('close', r));
   pass('first render still completes', firstCode === 0 && firstOut.includes(`(${frames} frames verified)`), firstCode ? firstOut.slice(-300) : '');
   pass('lock file removed afterwards', !fs.existsSync(lock));
+
+  // 5. formats + the UI kit example
+  const pngSize = (f) => { const b = fs.readFileSync(f); return [b.readUInt32BE(16), b.readUInt32BE(20)]; };
+  const vert = path.join(tmp, 'vertical-film');
+  const sv = spawnSync(process.execPath, [path.join(SKILL, 'scripts', 'new-project.js'), vert, '--format', '9:16'], { encoding: 'utf8' });
+  const st = sv.status === 0 && spawnSync(process.execPath, ['engine/render.js', 'stills', '@land'], { cwd: vert, encoding: 'utf8' });
+  const vf = path.join(vert, 'out', 'stills', 't_004.50.png');
+  const vsize = fs.existsSync(vf) ? pngSize(vf) : [];
+  pass('--format 9:16 → 1080x1920 frames', vsize[0] === 1080 && vsize[1] === 1920 && !/EXCEPTION/.test((st && st.stdout + st.stderr) || ''), vsize.join('x') || (st ? st.stdout + st.stderr : sv.stdout + sv.stderr).slice(-300));
+  const promo = path.join(tmp, 'promo-film');
+  const sp = spawnSync(process.execPath, [path.join(SKILL, 'scripts', 'new-project.js'), promo, '--from', 'app-promo'], { encoding: 'utf8' });
+  const ps = sp.status === 0 && spawnSync(process.execPath, ['song.js'], { cwd: promo, encoding: 'utf8' });
+  const pb = ps && ps.status === 0 && spawnSync(process.execPath, ['engine/render.js', 'board'], { cwd: promo, encoding: 'utf8' });
+  const pbOut = pb ? pb.stdout + pb.stderr : '';
+  pass('app-promo example: music + storyboard of every marker (UI kit, 9:16)', !!pb && pb.status === 0 && /board written: out\/board\.png \(9 frames\)/.test(pbOut) && !/EXCEPTION/.test(pbOut), pbOut.slice(-300) || (ps ? ps.stdout + ps.stderr : sp.stdout + sp.stderr).slice(-300));
 
   const failed = results.filter((r) => !r.ok).length;
   console.log(`\n${results.length - failed}/${results.length} checks passed${failed ? '' : ' — engine OK'}`);

@@ -2,8 +2,10 @@
 (function () {
   const U = globalThis.U;
   const G = {};
-  G.W = 1920;
-  G.H = 1080;
+  // frame size from score.js (FORMAT: '16:9' | '9:16' | '1:1' | '4:5' | [w, h]), 1920x1080 by default.
+  // Lay films out with G.W / G.H and keep text inside G.SAFE (see U.safeArea).
+  [G.W, G.H] = U.formatSize(globalThis.SCORE && globalThis.SCORE.FORMAT);
+  G.SAFE = U.safeArea(G.W, G.H);
   G.t = 0;
   G.boil = 0;
 
@@ -398,7 +400,8 @@
     if (vignette > 0) {
       ctx.globalCompositeOperation = 'multiply';
       ctx.globalAlpha = 1;
-      const g = ctx.createRadialGradient(G.W / 2, G.H / 2, G.H * 0.35, G.W / 2, G.H / 2, G.H * 1.05);
+      const m = Math.min(G.W, G.H);
+      const g = ctx.createRadialGradient(G.W / 2, G.H / 2, m * 0.35, G.W / 2, G.H / 2, m * 1.05);
       g.addColorStop(0, 'rgba(255,255,255,1)');
       g.addColorStop(1, `rgba(${Math.round(255 * (1 - vignette))},${Math.round(250 * (1 - vignette))},${Math.round(245 * (1 - vignette))},1)`);
       ctx.fillStyle = g;
@@ -417,7 +420,7 @@
   // ---------- particles ----------
   G.confettiColors = ['#E0703E', '#F2B84B', '#F6F0E2', '#3FA89B', '#E8718D', '#B79CFF'];
   // falling confetti, analytic in t (starts at t0)
-  G.confetti = (ctx, t, t0, { n = 140, seed = 1, x0 = 0, x1 = 1920, spawn = 1.2, fall = 260, until = Infinity } = {}) => {
+  G.confetti = (ctx, t, t0, { n = 140, seed = 1, x0 = 0, x1 = G.W, spawn = 1.2, fall = 260, until = Infinity } = {}) => {
     if (t < t0) return;
     ctx.save();
     for (let i = 0; i < n; i++) {

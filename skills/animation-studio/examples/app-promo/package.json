@@ -1,7 +1,7 @@
 {
-  "name": "my-film",
+  "name": "app-promo",
   "private": true,
-  "description": "A film where every frame and every sound is made of code.",
+  "description": "A 9:16 app promo (fictional app) built with the UI kit: every frame and every sound is code.",
   "scripts": {
     "music": "node song.js",
     "stems": "STEMS=1 node song.js && node engine/tools/levels.js out/music.wav out/stem-*.wav",

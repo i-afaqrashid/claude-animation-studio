@@ -21,6 +21,10 @@ const OUT = path.join(ROOT, 'out');
 const SCORE = require(path.join(ROOT, 'score.js'));
 const { FPS, DURATION } = SCORE;
 if (!FPS || !DURATION) throw new Error('score.js must export FPS and DURATION');
+const UTIL = require('./util');
+const [FW, FH] = UTIL.formatSize ? UTIL.formatSize(SCORE.FORMAT) : [1920, 1080]; // frame size (16:9 unless the score says otherwise)
+const PORTRAIT = FH > FW;
+const thumb = (long) => (PORTRAIT ? `scale=-2:${long}` : `scale=${long}:-2`); // scale thumbnails by the long side
 fs.mkdirSync(OUT, { recursive: true });
 
 // ---------- times: seconds | bar:beat | @marker[±sec] ----------
@@ -285,7 +289,9 @@ async function renderRange(f0, f1, workers, dest, { fmt = 'png', crf = 14, prese
 // Storyboard: key frames drawn straight into one labelled sheet inside the page.
 const BOARD_JS = `(async (items, cols) => {
   const src = document.getElementById('c');
-  const tw = 640, th = Math.round(640 * src.height / src.width), lh = 44, pad = 14;
+  const tall = src.height > src.width;
+  const tw = tall ? Math.round(640 * src.width / src.height) : 640, th = tall ? 640 : Math.round(640 * src.height / src.width);
+  const lh = tall ? 70 : 44, pad = 14;
   const rows = Math.ceil(items.length / cols);
   const b = document.createElement('canvas');
   b.width = cols * tw + (cols + 1) * pad; b.height = rows * (th + lh) + (rows + 1) * pad;
@@ -300,7 +306,8 @@ const BOARD_JS = `(async (items, cols) => {
     x.fillText(it.name, cx + 2, cy + th + 29);
     const nw = it.name ? x.measureText(it.name + '   ').width : 0;
     x.fillStyle = '#6B6B76'; x.font = '500 19px system-ui, -apple-system, Helvetica, Arial, sans-serif';
-    x.fillText(it.info, cx + 2 + nw, cy + th + 29);
+    if (tall) x.fillText(it.info, cx + 2, cy + th + 57); // narrow tiles: info on its own line
+    else x.fillText(it.info, cx + 2 + nw, cy + th + 29);
   });
   return b.toDataURL('image/png');
 })`;
@@ -310,7 +317,7 @@ const BOARD_JS = `(async (items, cols) => {
 // Picture: the frame with the biggest change near the marker (a cut, flash, stamp, pop…) must be the
 // first frame at/after the marker (±1 frame). Sound: the steepest level rise must be within ±20 ms.
 function verify(file) {
-  const VW = 96, VH = 54, FS = VW * VH, AR = 48000;
+  const VW = PORTRAIT ? 2 * Math.round((48 * FW) / FH) : 96, VH = PORTRAIT ? 96 : 2 * Math.round((48 * FH) / FW), FS = VW * VH, AR = 48000;
   const synced = Object.entries(MARKERS).filter(([, mk]) => typeof mk === 'object' && mk.sync);
   if (!synced.length) {
     console.log('no sync markers in score.js. Add some, e.g.\n  markers: { drop: { t: T(8), sync: \'av\' } }   // av = sound + picture, a = sound only, v = picture only');
@@ -325,17 +332,15 @@ function verify(file) {
     const raw = execFileSync(FFMPEG, ['-v', 'error', '-i', audioSrc, '-map', '0:a:0', '-ac', '1', '-ar', String(AR), '-f', 'f32le', '-'], big);
     aud = new Float32Array(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.length - (raw.length % 4)));
   }
-  // how UNEVENLY the frame changed: a cut, stamp or pop changes some pixels a lot; a fade or a
-  // brightness drift changes all of them alike, so the average change is subtracted first
+  // the share of pixels (in %) that change by more than 20/255 (~8%) from the previous frame:
+  // cuts, flashes, stamps and pops score high; fades, drifts and grain change every pixel only a
+  // little per frame and score ~0
   const diff = (k) => {
     if (k < 1 || k >= nF) return 0;
     const a = (k - 1) * FS, b = k * FS;
-    let mean = 0;
-    for (let i = 0; i < FS; i++) mean += vid[b + i] - vid[a + i];
-    mean /= FS;
-    let sum = 0;
-    for (let i = 0; i < FS; i++) sum += Math.abs(vid[b + i] - vid[a + i] - mean);
-    return sum / FS;
+    let n = 0;
+    for (let i = 0; i < FS; i++) if (Math.abs(vid[b + i] - vid[a + i]) > 20) n++;
+    return (100 * n) / FS;
   };
   function picture(t) {
     const k0 = Math.max(1, Math.floor((t - 0.25) * FPS)), k1 = Math.min(nF - 1, Math.ceil((t + 0.25) * FPS));
@@ -344,7 +349,7 @@ function verify(file) {
     const [bk, bd] = ds.reduce((m, d) => (d[1] > m[1] ? d : m), [-1, -1]);
     const sorted = ds.map((d) => d[1]).sort((a, b) => a - b);
     const typical = sorted[Math.floor(sorted.length / 2)];
-    return { frame: bk, clear: bd > 0.4 && bd > 2.5 * typical + 0.1 };
+    return { frame: bk, clear: bd > 1 && bd >= 1.8 * typical + 0.2 };
   }
   function sound(t) {
     const hop = 120, win = 240; // 2.5 ms hops, 5 ms windows
@@ -415,7 +420,7 @@ async function main() {
       console.log(`wrote ${file} (video + audio, ${dur.toFixed(2)}s verified)`);
     } else {
       const rows = Math.max(1, Math.ceil(DURATION / 2 / 6));
-      execFileSync(FFMPEG, ['-v', 'error', '-y', '-i', file, '-vf', `fps=0.5,scale=480:-1,tile=6x${rows}:padding=4:color=white`, '-frames:v', '1', path.join(OUT, 'check-sheet.png')]);
+      execFileSync(FFMPEG, ['-v', 'error', '-y', '-i', file, '-vf', `fps=0.5,${thumb(480)},tile=6x${rows}:padding=4:color=white`, '-frames:v', '1', path.join(OUT, 'check-sheet.png')]);
       const r = require('child_process').spawnSync(FFMPEG, ['-hide_banner', '-nostats', '-i', file, '-af', 'ebur128=peak=true', '-f', 'null', '-'], { encoding: 'utf8' });
       const sum = r.stderr.slice(r.stderr.lastIndexOf('Summary:'));
       console.log('contact sheet (every 2s): out/check-sheet.png');
@@ -450,7 +455,7 @@ async function main() {
       fs.writeFileSync(path.join(dir, `f${String(i).padStart(3, '0')}.png`), await grab(w, t));
     }
     w.close();
-    execFileSync(FFMPEG, ['-v', 'error', '-y', '-i', path.join(dir, 'f%03d.png'), '-vf', `scale=640:-1,tile=${cols}x${Math.ceil(n / cols)}:padding=6:color=white`, '-frames:v', '1', path.join(OUT, 'sheet.png')]);
+    execFileSync(FFMPEG, ['-v', 'error', '-y', '-i', path.join(dir, 'f%03d.png'), '-vf', `${thumb(640)},tile=${cols}x${Math.ceil(n / cols)}:padding=6:color=white`, '-frames:v', '1', path.join(OUT, 'sheet.png')]);
     console.log('sheet written: out/sheet.png');
   } else if (mode === 'board') {
     // default: every marker; else the middle of every section; else 12 frames across the film
@@ -465,7 +470,8 @@ async function main() {
       return { t, name: it.name, info: [`${it.t.toFixed(2)}s`, barBeat(it.t), sectionAt(it.t)].filter(Boolean).join(' · ') };
     });
     const w = await openWorker('w0');
-    const url = await evaluate(w.c, `${BOARD_JS}(${JSON.stringify(items)}, ${items.length > 9 ? 4 : 3})`);
+    const cols = PORTRAIT ? (items.length > 8 ? 6 : 4) : items.length > 9 ? 4 : 3;
+    const url = await evaluate(w.c, `${BOARD_JS}(${JSON.stringify(items)}, ${cols})`);
     w.close();
     fs.writeFileSync(path.join(OUT, 'board.png'), Buffer.from(url.slice(url.indexOf(',') + 1), 'base64'));
     console.log(`board written: out/board.png (${items.length} frames)`);

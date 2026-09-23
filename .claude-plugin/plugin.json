@@ -1,7 +1,7 @@
 {
   "name": "animation-studio",
-  "description": "Make hand-drawn animated short films where every frame is drawn in code and the soundtrack is synthesized in code, perfectly synced from one shared score. Outputs a finished 1080p MP4.",
-  "version": "0.3.0",
+  "description": "Make hand-drawn animated short films where every frame is drawn in code and the soundtrack is synthesized in code, perfectly synced from one shared score. Outputs a finished 1080p MP4: 16:9, or vertical 9:16 for Reels / TikTok / Shorts.",
+  "version": "0.4.0",
   "author": {
     "name": "Afaq Rashid",
     "url": "https://github.com/i-afaqrashid"
@@ -9,5 +9,5 @@
   "homepage": "https://github.com/i-afaqrashid/claude-animation-studio",
   "repository": "https://github.com/i-afaqrashid/claude-animation-studio",
   "license": "MIT",
-  "keywords": ["animation", "video", "music", "synthesizer", "motion-graphics", "canvas", "ffmpeg", "creative"]
+  "keywords": ["animation", "video", "music", "synthesizer", "motion-graphics", "canvas", "ffmpeg", "creative", "vertical-video", "promo"]
 }

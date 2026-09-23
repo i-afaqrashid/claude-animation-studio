@@ -36,10 +36,21 @@ Flicker a TV turning on: 1.3 → 0.25 → 1.0 → 0.55 → steady, within 0.2s.
 - **Impact frame**: a rotating sunburst of gold/cream wedges drawn *behind* the characters, thin ink rays only in the outer ring (r0 ≥ 560), a star at the contact point, a 0.85 white flash decaying at e^(−14t), and a freeze until the next beat.
 - **Title stamps**: each letter on a torn paper card (different colour per letter, Bungee 190px), scale 2.6 → 1 with outBack over 0.13s, random rotation ±0.15.
 
+## Formats and safe areas
+Set `FORMAT` in score.js: `'16:9'` (1920×1080, default), `'9:16'` (1080×1920: Reels, TikTok, Shorts), `'1:1'` (1080×1080), `'4:5'` (1080×1350: the Instagram feed). `G.W`/`G.H` follow it, and so do the canvas, textures, vignette and confetti. `G.SAFE = {x, y, w, h}` is where text, faces and logos stay visible. On 9:16 the platform UI covers the top 11.5% (header), the bottom 22% (caption, handle, audio) and 140px on the right (like/share buttons); on other formats it's a 5% margin.
+- **Vertical is not a crop.** Re-stage shots for a tall frame: stack instead of spreading (character below, title above), make the subject fill the width, and let the sky, wall or table fill the height. One idea per frame reads on a phone; wide two-shots don't.
+- **Size for a phone held at arm's length.** Titles ≥ 56px, labels ≥ 26px on a 1080-wide frame, and phone mockups ~1250px tall so the app text is readable.
+- **Hook in the first second.** Something moves on the first downbeat (a door opens, a character lands), because feeds scroll past still openers.
+- **Leave the bottom band quiet.** Put ground, tables or floors in the bottom 22%, never text.
+
+## Product UI (the `UI` kit)
+Real apps in a hand-drawn world: the phone and its screens are crisp (system font, rounded white cards, soft shadows, the brand colour on primary actions and "my" chat bubbles), while everything around them boils. `UI.phone(ctx, cx, cy, h, screen, t, {rot, dark})` gives the screen a 412-point-wide coordinate system, so layouts use real-app numbers (16pt margins, 17–26pt text, 78pt tab bar). Slide screens in from the right on bar lines (0.24s), push the world back with a translucent wash of the wall colour while the phone is up, and turn every UI event (a card, a tick, a chip, a bubble) into a note of the melody.
+
 ## Transitions
 - **Paper wipe**: a 2700px torn cream sheet crosses the screen, fully covering it exactly at the cut (`t0 = cut − 1 beat`). It can carry a word in Permanent Marker ("KICK-OFF!"). Draw captions *before* the wipe.
 - **Hard cut** on a bar line for shocks (interception → tension).
 - **Dissolve** (0.8s) out of a frozen climax into the calm outro.
+- **Circle wipe** `UI.iris(ctx, t, tc, {cx, cy, color})`: a brand-colour disc grows from the key object until the frame is covered at `tc`, then a hole opens to the next shot. For a logo hit, draw only the closing half and cut hard to the end card at `tc` (the cut is the visible hit).
 
 ## Text
 - Captions: `G.caption(ctx, {t, end, text, x, y, rot, size}, t)` with Caveat Bold, a torn cream note and 2 tape strips. They pop in with outBack.

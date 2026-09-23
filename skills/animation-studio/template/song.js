@@ -51,7 +51,7 @@ for (const c of sc.chords) {
 for (const n of sc.musicbox) { const mb = I.musicBox(n.midi); keys.addMono(mb, n.t, 0.18); verb.addMono(mb, n.t, 0.18); dly.addMono(mb, n.t, 0.08); }
 for (const n of sc.starNotes) {
   const x = I.marimba(n.midi, { thock: 0 });
-  const pan = (n.x / 1920 - 0.5) * 1.2; // the sound comes from where the star appears
+  const pan = (n.x / sc.W - 0.5) * 1.2; // the sound comes from where the star appears
   keys.addMono(x, n.t, 0.45, pan);
   verb.addMono(x, n.t, 0.2);
 }

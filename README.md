@@ -20,6 +20,8 @@ Ask Claude for a video, and it:
 
 Because one score drives both sides, a football pass can *play* a note of the melody, a title can stamp one letter per 8th note, and fireworks can burst exactly on the clap.
 
+**Any format, including vertical.** 16:9 for YouTube and X, **9:16 for Reels, TikTok and Shorts** (laid out for the platforms' safe areas, not cropped), 1:1 and 4:5 for feeds. A UI kit draws crisp app screens (phone mockup, cards, chat, stats, buttons) inside the hand-drawn world, which makes it good for app and brand promos too.
+
 **Your own characters.** People are fully customizable: hair (curly, long, bun, hijab…), beards, glasses, outfits (jersey, hoodie, dress, shalwar kameez…), build and colours. Claude can also build new characters, like pets, robots or mascots, from the same hand-drawn primitives, and drop your real photos into a film as taped prints. Share a photo and say either **"make a cartoon of me"** (Claude designs a matching character) or **"put this photo in the film"** (the real photo appears as a taped print).
 
 ## Install (Claude Code)
@@ -40,7 +42,7 @@ Then just ask, in any project:
 ## Using the engine by hand
 
 ```bash
-node skills/animation-studio/scripts/new-project.js my-film        # starter (23s demo)
+node skills/animation-studio/scripts/new-project.js my-film        # starter (23s demo); add --format 9:16 for vertical
 cd my-film
 node song.js                   # music  -> out/music.wav
 node engine/render.js board    # storyboard of every named moment -> out/board.png
@@ -52,7 +54,7 @@ node engine/render.js verify   # measures sound + picture at every sync marker
 
 Times can be seconds, `bar:beat` (`8:2`), or a named moment from the score (`@drop`, `@drop+0.5`).
 
-Add `--from world-cup-2026` to re-render or remix the full 58s reference film instead.
+Add `--from app-promo` for a 9:16 app promo built with the UI kit (a fictional app), or `--from world-cup-2026` to re-render or remix the full 58s reference film.
 
 ## What's inside
 
@@ -61,7 +63,8 @@ skills/animation-studio/
 ├── SKILL.md              instructions Claude follows
 ├── references/           storytelling, music cookbook, visual style, engine API, gotchas
 ├── engine/               synth (DSP, instruments, mixing), drawing toolkit, characters, renderer
-├── template/             a 23s starter film
+├── template/             a 23s starter film (any format)
+├── examples/app-promo/        a 20s vertical app promo (UI kit)
 ├── examples/world-cup-2026/   the full reference film
 └── scripts/new-project.js     scaffolds a new film
 ```

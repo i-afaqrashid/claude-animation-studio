@@ -13,6 +13,7 @@
   const Studio = {};
   Studio.film = ({ draw, duration, post = {}, fadeOut = 1.6, init } = {}) => {
     const canvas = document.getElementById('c');
+    canvas.width = G.W; canvas.height = G.H; // the score's FORMAT (gfx.js read it)
     const ctx = canvas.getContext('2d');
     const DUR = duration ?? (globalThis.SCORE && globalThis.SCORE.DURATION);
 
