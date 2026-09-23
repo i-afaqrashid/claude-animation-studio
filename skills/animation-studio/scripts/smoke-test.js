@@ -1,8 +1,10 @@
 #!/usr/bin/env node
-// End-to-end smoke test for the engine. Builds a throwaway 4.5s film in a temp folder and checks:
-//   1. music + parallel render + mux + check succeed (frames, streams, duration verified)
-//   2. an ffmpeg that crashes mid-stream makes the render FAIL cleanly (no hang, no leftover Chrome)
-//   3. a second render in the same project folder is refused while the first one still succeeds
+// End-to-end smoke test for the engine. Builds a throwaway 7s film in a temp folder and checks:
+//   1. music (true peak under -1 dBTP) + parallel render + mux + check succeed (frames, streams, duration verified)
+//   2. named markers: bad times fail fast, board + clip (with sound) work, verify passes on the real film
+//      and FAILS when a marker is 100 ms off
+//   3. an ffmpeg that crashes mid-stream makes the render FAIL cleanly (no hang, no leftover Chrome)
+//   4. a second render in the same project folder is refused while the first one still succeeds
 // Usage: node <skill>/scripts/smoke-test.js        (takes ~2–4 minutes; needs Node 22+, ffmpeg, Chrome)
 const fs = require('fs');
 const os = require('os');
@@ -36,15 +38,18 @@ const probe = (file) => JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-sho
   console.log(`smoke test in ${tmp}`);
   const scaffold = spawnSync(process.execPath, [path.join(SKILL, 'scripts', 'new-project.js'), proj], { encoding: 'utf8' });
   pass('scaffold from template', scaffold.status === 0, scaffold.status === 0 ? '' : scaffold.stdout + scaffold.stderr);
-  // shorten the film: 4.5s keeps the test quick
+  // shorten the film: 7s keeps the test quick; the @land sync marker (4.5s) sits before the 1.6s fade-out
   const scorePath = path.join(proj, 'score.js');
-  fs.writeFileSync(scorePath, fs.readFileSync(scorePath, 'utf8').replace(/const DURATION = [^;]+;/, 'const DURATION = T(2); // smoke test'));
+  fs.writeFileSync(scorePath, fs.readFileSync(scorePath, 'utf8').replace(/const DURATION = [^;]+;/, 'const DURATION = T(2) + 2.5; // smoke test'));
   const { DURATION, FPS } = require(scorePath);
   const frames = Math.round(DURATION * FPS);
 
   // 1. happy path
   const song = run(['song.js']);
   pass('song.js writes out/music.wav', song.code === 0 && fs.existsSync(path.join(proj, 'out', 'music.wav')), song.code ? song.out.slice(-300) : '');
+  const tp = spawnSync('ffmpeg', ['-hide_banner', '-nostats', '-i', path.join(proj, 'out', 'music.wav'), '-af', 'ebur128=peak=true', '-f', 'null', '-'], { encoding: 'utf8' });
+  const peak = parseFloat((/Peak:\s+(-?[\d.]+|-inf)/.exec(tp.stderr.slice(tp.stderr.lastIndexOf('Summary:'))) || [])[1]);
+  pass('master limiter keeps the true peak under -1 dBTP', peak <= -1.0, `${peak} dBTP`);
   const before = chromePids();
   const vid = run(['engine/render.js', 'video', '2']);
   pass('render video (2 workers)', vid.code === 0 && vid.out.includes(`(${frames} frames verified)`), vid.code ? vid.out.slice(-400) : `${vid.secs.toFixed(0)}s`);
@@ -58,7 +63,25 @@ const probe = (file) => JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-sho
   const leftover1 = [...chromePids()].filter((p) => !before.has(p));
   pass('no Chrome processes left after a successful render', leftover1.length === 0, leftover1.length ? `leftover pids ${leftover1.join(',')}` : '');
 
-  // 2. ffmpeg crashes mid-stream (after ~300 KB of PNG data): must fail fast, not hang
+  // 2. named markers, board, clip, verify
+  const badT = run(['engine/render.js', 'stills', '@nope'], { timeout: 30000 });
+  pass('an unknown @marker fails fast with a clear message', badT.code !== 0 && /unknown marker @nope/.test(badT.out) && badT.secs < 10, `exit ${badT.code} in ${badT.secs.toFixed(1)}s`);
+  const board = run(['engine/render.js', 'board']);
+  pass('board → labelled storyboard of the markers', board.code === 0 && fs.existsSync(path.join(proj, 'out', 'board.png')), board.code ? board.out.slice(-300) : '');
+  const clip = run(['engine/render.js', 'clip', '@land-0.5', '@land+0.5', '2']);
+  const clipFile = path.join(proj, 'out', 'clip_4.00-5.00.mp4');
+  let clipOk = clip.code === 0 && fs.existsSync(clipFile);
+  if (clipOk) { const p = probe(clipFile); clipOk = p.streams.some((x) => x.codec_type === 'audio') && Math.abs(parseFloat(p.format.duration) - 1) < 2 / FPS; }
+  pass('clip @land-0.5 @land+0.5 → 1s preview with sound', clipOk, clip.code ? clip.out.slice(-300) : '');
+  const ver = run(['engine/render.js', 'verify']);
+  pass('verify: sound and picture hit @land', ver.code === 0 && /land .*✓.*✓/.test(ver.out) && /✓ in sync/.test(ver.out), ver.out.split('\n').filter((l) => /land|sync/.test(l)).join(' | '));
+  const goodScore = fs.readFileSync(scorePath, 'utf8');
+  fs.writeFileSync(scorePath, goodScore.replace("land: { t: ev.claudeLand, sync: 'av' }", "land: { t: ev.claudeLand + 0.1, sync: 'av' }"));
+  const ver2 = run(['engine/render.js', 'verify']);
+  fs.writeFileSync(scorePath, goodScore);
+  pass('verify FAILS when a marker is 100 ms off', ver2.code === 1 && /✗/.test(ver2.out), `exit ${ver2.code}`);
+
+  // 3. ffmpeg crashes mid-stream (after ~300 KB of PNG data): must fail fast, not hang
   const fake = path.join(tmp, 'crashing-ffmpeg.sh');
   fs.writeFileSync(fake, '#!/bin/sh\nhead -c 300000 > /dev/null\nexit 3\n', { mode: 0o755 });
   const before2 = chromePids();
@@ -69,7 +92,7 @@ const probe = (file) => JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-sho
   pass('no Chrome processes left after a failed render', leftover2.length === 0, leftover2.length ? `leftover pids ${leftover2.join(',')}` : '');
   pass('failed render did not replace the good out/video.mp4', probe(path.join(proj, 'out', 'video.mp4')).streams.length === 1);
 
-  // 3. two renders in the same folder: the second is refused, the first still succeeds
+  // 4. two renders in the same folder: the second is refused, the first still succeeds
   const first = spawn(process.execPath, ['engine/render.js', 'video', '2'], { cwd: proj });
   let firstOut = '';
   first.stdout.on('data', (d) => (firstOut += d));

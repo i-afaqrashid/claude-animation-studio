@@ -52,6 +52,21 @@ One shot per bar, cut on the downbeat; every 4 bars add an instrument (drums →
 ### Musical explainer (30–45s, 100–110 BPM)
 Problem (minor key, sparse, 2 bars) → "what if" (a riser into the major key) → reveal (brand-colour sunburst) → 3–4 features, one per bar, each with its own sound and a caption stamped on beat 1 → a logo or handwritten sign-off on the tonic. A silence before the reveal is optional; skip it for calm brands.
 
+A worked app promo (108 BPM, 18 bars, 42s; the user journey IS the story, and each step has its own gimmick):
+| bars | picture | sync gimmick |
+|---|---|---|
+| 0–1 | the hero on a bench, a thought bubble ("where to next?") | music box plays the hook; a doodle pops on every 3rd note |
+| 2–4 | the phone rises and fills the frame: the real app feed | each hook note = a UI event (card slides in, tag pops, title stamps) on a plucked guitar |
+| 5 | saving favourites | one heart flies to the collection per note |
+| 6–7 | a request is written line by line, folds into a paper plane, 3 replies come back | a writing tick per line; a bell ping per reply, rising |
+| 8–9 | chat on the phone, the two people beside it | call and response: one bubble per beat (guitar vs e-piano) |
+| 10 | booking: packing items tossed into a suitcase | items on 8ths as a rising scale; half a beat of silence; the lid SNAPS on the downbeat with a stamp ("BOOKED ✓") |
+| 11 | a map, the route drawn stop by stop | a tom hit per stop |
+| 12 | the payoff scene, "We're going." | flash cut, full band, brass on the hook |
+| 13–15 | a calmer beat for a sensitive topic, a community moment, numbers stamped | drums drop out; then a brass stab per stat, rising |
+| 16–17 | logo, tagline word by word, the call to action | bells + a held maj9 chord; hold the end card ≥ 2 s at full brightness before the fade |
+Brand films: use the brand's own colours and font in the UI (a clean system font inside the phone), keep the hand-drawn world around it, only use numbers the client confirms, and keep sacred or sensitive subjects respectful (no comedy, no depictions they would not approve).
+
 ## Sync gimmicks (the jaw-droppers)
 
 Each one ties visible objects to audible events, both generated from the same score list:

@@ -42,8 +42,30 @@ function highpass(bus, hz = 22) {
   for (let i = 0; i < bus.n; i++) { bus.L[i] = hl.hp(bus.L[i], hz); bus.R[i] = hr.hp(bus.R[i], hz); }
 }
 
-// Glue compressor + 4ms lookahead brickwall limiter. drive ~0.8 lands near -11 LUFS for a busy mix.
-function master(b, drive = 0.8, ceiling = 0.93) {
+// True peak: the waveform between two samples can swing higher than either sample, and every
+// resampler / AAC encoder reconstructs those in-between values. Estimate them like a BS.1770
+// true-peak meter: 4x oversampling with a Hann-windowed sinc (12 taps per phase).
+const TP_PHASES = [0.25, 0.5, 0.75].map((f) => {
+  const h = [];
+  for (let k = -5; k <= 6; k++) { const x = k - f; h.push((Math.sin(Math.PI * x) / (Math.PI * x)) * 0.5 * (1 + Math.cos((Math.PI * x) / 6.5))); }
+  const sum = h.reduce((a, v) => a + v, 0);
+  return h.map((v) => v / sum);
+});
+function truePeakAt(x, i) {
+  let pk = Math.abs(x[i]);
+  if (i < 5 || i + 6 >= x.length) return pk;
+  for (const h of TP_PHASES) {
+    let s = 0;
+    for (let k = 0; k < 12; k++) s += x[i - 5 + k] * h[k];
+    if (s > pk) pk = s; else if (-s > pk) pk = -s;
+  }
+  return pk;
+}
+
+// Glue compressor + 4ms lookahead brickwall limiter. drive ~0.8 lands near -13 LUFS for a busy mix.
+// ceiling is a TRUE-peak ceiling: 0.84 ≈ -1.5 dBTP, so uploads (AAC, platform resampling) never clip.
+// { truePeak: false } restores the old sample-peak limiter (v0.2 behaviour, used with ceiling 0.93).
+function master(b, drive = 0.8, ceiling = 0.84, { truePeak = true } = {}) {
   const N = b.n;
   let env = 0;
   for (let i = 0; i < N; i++) {
@@ -56,7 +78,8 @@ function master(b, drive = 0.8, ceiling = 0.93) {
   }
   const la = Math.round(0.004 * SR);
   const peak = new Float32Array(N);
-  for (let i = 0; i < N; i++) peak[i] = Math.max(Math.abs(b.L[i]), Math.abs(b.R[i]));
+  if (truePeak) for (let i = 0; i < N; i++) peak[i] = Math.max(truePeakAt(b.L, i), truePeakAt(b.R, i));
+  else for (let i = 0; i < N; i++) peak[i] = Math.max(Math.abs(b.L[i]), Math.abs(b.R[i]));
   const want = new Float32Array(N);
   const dq = [];
   let head = 0;

@@ -63,12 +63,23 @@
     }));
   const brass = [...placeBar(clock, HOOK[1], 6), ...placeBar(clock, HOOK[2], 7), ...placeBar(clock, HOOK.end, 8), { t: T(9), dur: 2.5, midi: m('F5') }];
 
+  // ---------- named moments ----------
+  // Use them anywhere a time goes: `render.js stills @drop`, `clip @drop-2 @drop+3`, `board` (all markers).
+  // sync: 'av' makes `render.js verify` measure that the sound AND the picture hit this exact time
+  // ('a' = sound only, 'v' = picture only). Give it to the hits: landings, cuts, stamps, drops.
+  const markers = {
+    land: { t: ev.claudeLand, sync: 'av' }, // boing + thud as Claude lands, the drums start
+    breath: ev.breath, // silence + freeze (a name only: nothing to hit)
+    drop: { t: ev.drop, sync: 'av' }, // crash + sub boom, the sunburst and the constellation
+    end: ev.end,
+  };
+
   const captions = [
     { t: T(0, 1), end: T(1, 3.5), text: 'a tiny film, made of code.', x: 140, y: 110, rot: -0.04, size: 60 },
     { t: T(3, 0), end: T(5, 2.5), text: 'every star is a note.', x: 1180, y: 110, rot: 0.04, size: 56 },
   ];
   const endText = { words: [{ w: 'made', t: T(9, 0), d: 0.45 }, { w: 'with', t: T(9, 1), d: 0.4 }, { w: 'code.', t: T(9, 2), d: 0.5 }], sub: { t: T(9, 2.6), text: '(the music too)' } };
 
-  const SCORE = { FPS, DURATION, clock, T, BEAT, S, m, chords, chordAt, HOOK, ev, musicbox, starNotes, brass, captions, endText };
+  const SCORE = { FPS, DURATION, clock, T, BEAT, S, m, chords, chordAt, HOOK, ev, markers, musicbox, starNotes, brass, captions, endText };
   if (node) module.exports = SCORE; else globalThis.SCORE = SCORE;
 })();

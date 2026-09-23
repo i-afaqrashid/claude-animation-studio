@@ -9,17 +9,14 @@
 5. Note the contact sheet sorts filenames lexicographically; `stills` pads times (`t_009.75`) so order is preserved.
 
 ## Sync verification (do this on the final MP4)
-Audio onset at the big hit (e.g. the drop after the silence):
-```bash
-ffmpeg -v error -y -ss <hit-0.6> -t 1.0 -i out/<name>.mp4 -map 0:a -ac 1 -ar 48000 -f f32le out/hit.raw
-node -e "const b=require('fs').readFileSync('out/hit.raw');for(let i=0;i<b.length/4;i++){if(i/48000>0.3&&Math.abs(b.readFloatLE(i*4))>0.2){console.log((<hit-0.6>+i/48000).toFixed(3));break}}"
+Give every hit a `sync` marker in `score.js`, then `node engine/render.js verify`:
 ```
-Brightest frame (flash) near the hit:
-```bash
-ffmpeg -v error -y -ss <hit-0.2> -t 0.4 -i out/<name>.mp4 -vf "scale=64:36,format=gray" -f rawvideo out/f.raw
-node -e "const b=require('fs').readFileSync('out/f.raw'),n=64*36;for(let f=0;f*n<b.length;f++){let s=0;for(let i=0;i<n;i++)s+=b[f*n+i];console.log((<hit-0.2>+f/<FPS>).toFixed(3),(s/n).toFixed(1))}"
+marker        score      sound                 picture
+snap          24.944s    24.944s +0ms ✓        25.000s +1f ✓
+flash         27.167s    27.167s +0ms ✓        27.167s +0f ✓
+✓ in sync
 ```
-Both must equal the score's timestamp (the World Cup film: 32.500s for both).
+Reading it: sound ±20 ms and picture ±1 frame pass. The picture measures how unevenly a frame changes (fades and brightness drifts are subtracted), so cuts, flashes, stamps and pops stand out. It can land one frame off when motion accelerates INTO the hit (a lid slamming shut) or when the hit starts small (a pop growing from scale 0). ✗ = a real offset: move the event in `score.js` so both sides read the same time. `?` = no distinct hit near the marker (a small pop in a busy frame, a note buried in the mix): make the moment clearer, or give it `sync: 'a'` / `'v'` / no sync.
 
 ## Performance
 - About 300ms per frame per worker for heavy scenes. 7 workers on 8 cores: a 58s film in ~7–8 min. Always run `video` with `run_in_background: true` (it exceeds the 2-minute Bash timeout).
@@ -47,6 +44,13 @@ Both must equal the score's timestamp (the World Cup film: 32.500s for both).
 | Another render is already running | several Claude sessions can render at once | ports are OS-assigned so they never collide; never kill processes you didn't launch |
 | Render hangs forever | ffmpeg died while the renderer waited for its pipe to drain | the wait races against ffmpeg's exit and fails fast (done; covered by `scripts/smoke-test.js`) |
 | Two renders in one project trample `out/` | shared temp folders | per-run temp dirs + `out/.render.lock`; the second render is refused (done) |
+| Audio clips after upload although `check` said Peak -0.4 dBFS | inter-sample peaks: the waveform between samples overshoots, and AAC/resamplers reconstruct it | `MIX.master` limits the 4x-oversampled TRUE peak to -1.5 dBTP (done in v0.3) |
+| A circle wipe draws a giant wedge instead of a hole | `rect()` then `arc()` in one path: the arc is joined to the rect by a straight line | `ctx.moveTo(cx + r, cy)` before `ctx.arc(…)`, then `fill('evenodd')` |
+| Two captions overlap into gibberish at a hand-off | caption A's end is after caption B's start | end A before B starts (the fade-out takes 0.25 s) |
+| An object that "exits" still peeks in at the frame edge | moved off by less than half its size | move its CENTRE past `H + height/2` (or `W + width/2`) |
+| A new prop fades in on top of an object that is leaving | draw order | draw the leaving object last until it is gone |
+| An opening lid/door covers a character | pivot on the side facing the character | hinge it on the side facing empty space |
+| A flying prop crosses the caption | arc peak inside the caption's box | start props below the caption line or from a character's hand |
 
 ## Etiquette on the user's machine
 - Never kill processes the renderer did not start (another session may be rendering), and never touch the user's dev servers or ports (e.g. 3000).

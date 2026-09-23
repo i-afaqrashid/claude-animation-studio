@@ -61,6 +61,10 @@ Stem balance in the loudest section (RMS dB, after GAIN): drums ≈ -13, brass (
 
 If the whole mix reads as one flat loudness (LRA < 3), the intro is too loud or the master is over-driven. Lower the intro instruments, not the drop.
 
+True peak: `MIX.master` limits the 4x-oversampled true peak to -1.5 dBTP by default, which survives AAC and platform resampling (-1.2 dBTP measured after AAC 256k). It costs about 0.1 LU of loudness. `check` must show Peak ≤ -1.0 dBFS on the final MP4.
+
+Acoustic colour: `I.guitar(midi, dur, { bright: 0.3–0.8, sustain: 0.99–0.998 })` is a Karplus-Strong string whose loop delay is tuned with an allpass (±0.2 cents from E2 to C#6), with two body resonances (330 Hz, 1.9 kHz). It suits a warm lead, arpeggios and "every card is a note" gimmicks (lead GAIN ≈ 3–4, it is quieter than a synth). `I.epiano(midi, dur)` is an FM electric piano with a bell tine; pair it with the guitar for call-and-response (chat bubbles: the traveler on guitar panned right, the reply on e-piano panned left).
+
 ## Checking without ears
 
 1. `levels.js` per stem per section (the table above).

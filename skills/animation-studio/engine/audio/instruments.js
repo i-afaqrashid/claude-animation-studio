@@ -179,6 +179,47 @@ function pluck(midi, { decay = 0.16, cutoff = 3200, seed = 11 } = {}) {
   return out;
 }
 
+// plucked acoustic guitar (Karplus-Strong). An allpass sets the fractional delay, so every note
+// is in tune (±2 cents measured); two body resonances give the wooden box. dur = how long it rings
+// before the string is damped. bright 0.3 (warm, thumb) … 0.8 (pick), sustain 0.99 (short) … 0.998 (long).
+function guitar(midi, dur = 0.8, { bright = 0.55, sustain = 0.9965, seed = 1 } = {}) {
+  const P = SR / mtof(midi);
+  const Nd = Math.max(2, Math.floor(P - 0.6));
+  const d = P - 0.5 - Nd, c = (1 - d) / (1 + d); // allpass for the fractional part of the loop delay
+  const out = buf(dur + 0.9);
+  const line = new Float32Array(Nd);
+  const r = rng(seed * 7 + midi);
+  let lp = 0;
+  for (let i = 0; i < Nd; i++) { lp += (r() - lp) * bright; line[i] = lp; }
+  let w = 0, last = 0, apX = 0, apY = 0;
+  const bodyA = new SVF(), bodyB = new SVF();
+  for (let i = 0; i < out.length; i++) {
+    const t = i / SR;
+    const y0 = line[w];
+    const avg = 0.5 * (y0 + last); last = y0;
+    const ap = c * avg + apX - c * apY; apX = avg; apY = ap;
+    line[w] = ap * (t < dur ? sustain : 0.93);
+    w = (w + 1) % Nd;
+    const s = y0 * 0.7 + bodyA.bp(y0, 330, 1.2) * 0.5 + bodyB.bp(y0, 1900, 2.5) * 0.22;
+    out[i] = s * Math.min(1, t / 0.002) * 0.9;
+  }
+  return out;
+}
+
+// warm FM electric piano (a Rhodes-like bell tine). index = brightness of the attack.
+function epiano(midi, dur = 0.6, { index = 1.6, decay = 1.1 } = {}) {
+  const f = mtof(midi);
+  const out = buf(dur + 0.8);
+  for (let i = 0; i < out.length; i++) {
+    const t = i / SR;
+    const idx = index * Math.exp(-t / 0.22) + 0.25;
+    const env = Math.min(1, t / 0.003) * Math.exp(-t / decay) * (t > dur ? Math.max(0, 1 - (t - dur) / 0.3) : 1);
+    const s = Math.sin(TAU * f * t + idx * Math.sin(TAU * f * t)) + 0.22 * Math.sin(TAU * 2 * f * t) * Math.exp(-t / 0.25) + 0.08 * Math.sin(TAU * 14 * f * t) * Math.exp(-t / 0.02);
+    out[i] = s * env * 0.6;
+  }
+  return out;
+}
+
 // ================= MALLETS =================
 function musicBox(midi, { decay = 1.4, seed = 12 } = {}) {
   const f = mtof(midi);
@@ -547,7 +588,7 @@ function scribble(len, seed = 31) {
 }
 
 module.exports = {
-  kick, snare, clap, hat, crash, tom, shaker, bell, bass, padNote, pluck, musicBox, marimba, brassNote, voice,
+  kick, snare, clap, hat, crash, tom, shaker, bell, bass, padNote, pluck, guitar, epiano, musicBox, marimba, brassNote, voice,
   noiseSweep, boing, thud, paperFwip, tvClick, whistle, bwomp, heartbeat, woodTick, thwack, subBoom, pop,
   fireworkBurst, launchWhistle, scribble, buf,
 };
