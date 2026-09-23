@@ -2,7 +2,9 @@
 
 **A Claude Code plugin for making animated short films where every frame is drawn in code and the music is synthesized in code, perfectly in sync.**
 
-![demo: the held breath, GOOOOOAL, the celebration](assets/demo-goal.gif)
+🔊 **Sound on**. The music is made in code too.
+
+https://github.com/user-attachments/assets/9168dc15-a663-4611-a5de-5dd5a20bd7b9
 
 *From "Claude × Afaq, World Cup 2026", a 58-second film Claude made with this skill. The frames and the soundtrack come from zero samples, stock clips, or music libraries: drums, bass, brass, the crowd, and a street chanting "o-lé".*
 
