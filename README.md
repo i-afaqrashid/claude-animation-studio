@@ -16,7 +16,8 @@ Ask Claude for a video, and it:
 2. puts every moment in one **score file** that both the music and the animation read,
 3. **synthesizes the soundtrack** in plain JavaScript: drums, bass, pads, brass, music box, formant-synthesized crowds and choirs, and sound effects,
 4. **draws every frame** in a hand-drawn paper-cutout style (boiling pencil lines, hatching, torn-paper captions),
-5. renders a 1080p MP4 with headless Chrome + ffmpeg, then **checks its own work**: a storyboard for your approval before the full render, loudness and true-peak measurements, and `verify`, which measures that the sound and the picture hit every key moment (±20 ms, ±1 frame).
+5. lets you **watch and listen before rendering** (a live preview in your browser with a timeline of every scene and moment),
+6. renders a 1080p MP4 with headless Chrome + ffmpeg, then **checks its own work**: a storyboard for your approval before the full render, loudness and true-peak measurements, and `verify`, which measures that the sound and the picture hit every key moment (±20 ms, ±1 frame).
 
 Because one score drives both sides, a football pass can *play* a note of the melody, a title can stamp one letter per 8th note, and fireworks can burst exactly on the clap.
 
@@ -45,7 +46,9 @@ Then just ask, in any project:
 node skills/animation-studio/scripts/new-project.js my-film        # starter (23s demo); add --format 9:16 for vertical
 cd my-film
 node song.js                   # music  -> out/music.wav
+node engine/render.js preview  # watch + listen live in your browser (timeline, markers, loop)
 node engine/render.js board    # storyboard of every named moment -> out/board.png
+node engine/render.js cast     # every character in 6 expressions -> out/cast.png
 node engine/render.js clip @drop-2 @drop+3   # one section with sound -> out/clip_*.mp4
 node engine/render.js video    # frames  -> out/video.mp4
 node engine/render.js mux      # final   -> out/my-film.mp4

@@ -8,6 +8,9 @@
 //   node engine/render.js mux [name]             -> out/<name>.mp4 (video + out/music.wav, shareable H.264/AAC)
 //   node engine/render.js check [name]           -> out/check-sheet.png + loudness report of the final file
 //   node engine/render.js verify [name]          -> measures sound + picture at every sync marker of the final file
+//   node engine/render.js preview [t]            -> live preview WITH SOUND in your browser (local page, random port)
+//   node engine/render.js cast                   -> out/cast.png: every character × 6 expressions/poses (audition sheet)
+//   add --gif to clip for a shareable GIF next to the MP4
 // Anywhere a time is expected: seconds (12.5), bar:beat from the score clock (8:2 = T(8, 2)),
 // or a named marker from score.js `markers` with an optional offset in seconds (@drop, @drop-2, @drop+0.5).
 const { spawn, execFileSync } = require('child_process');
@@ -54,6 +57,21 @@ function barBeat(t) {
   const bar = Math.floor(p / bpb), beat = +(p - bar * bpb).toFixed(2);
   return p < 0 ? '' : `bar ${bar}:${beat}`;
 }
+// Frames must be a pure function of t (parallel workers draw any frame in any order), and the
+// score must give the same events on every run. Warn about the usual ways that breaks.
+function lintDeterminism() {
+  const html = fs.existsSync(path.join(ROOT, 'index.html')) ? fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8') : '';
+  const files = new Set(['score.js', 'song.js']);
+  for (const m of html.matchAll(/<script\s+src="([^"]+)"/g)) if (!m[1].startsWith('engine/')) files.add(m[1]);
+  const bad = /\b(Math\.random|Date\.now|performance\.now|new Date)\s*\(/;
+  const hits = [];
+  for (const f of files) {
+    const fp = path.join(ROOT, f);
+    if (!fs.existsSync(fp)) continue;
+    fs.readFileSync(fp, 'utf8').split('\n').forEach((line, i) => { if (bad.test(line.replace(/\/\/.*$/, ''))) hits.push(`${f}:${i + 1}: ${line.trim().slice(0, 90)}`); });
+  }
+  if (hits.length) console.warn(`warning: frames must be a pure function of t. Use U.hash / U.mulberry32(seed) and t instead of:\n  ${hits.join('\n  ')}`);
+}
 const sectionAt = (t) => (SCORE.S ? (Object.entries(SCORE.S).find(([, [a, b]]) => t >= a && t < b) || [''])[0] : '');
 
 function findChrome() {
@@ -69,7 +87,7 @@ const CHROME = findChrome();
 const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg';
 const FFPROBE = process.env.FFPROBE_PATH || 'ffprobe';
 
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.ttf': 'font/ttf', '.otf': 'font/otf', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.json': 'application/json' };
+const MIME = { '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.mp4': 'video/mp4', '.html': 'text/html', '.js': 'text/javascript', '.ttf': 'font/ttf', '.otf': 'font/otf', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.json': 'application/json' };
 let PAGE = null;
 // Serve over HTTP: Chrome refuses @font-face / FontFace loads from file:// URLs.
 // Only files INSIDE the project folder are served (checked after resolving symlinks), read-only, localhost only.
@@ -88,6 +106,12 @@ function resolveSafe(url) {
 function serve() {
   return new Promise((resolve) => {
     const srv = http.createServer((req, res) => {
+      if ((req.method === 'GET' || req.method === 'HEAD') && req.url.split(/[?#]/)[0] === '/__preview') {
+        // the film's own page + the preview player (the page itself is never written to disk)
+        const html = fs.readFileSync(path.join(ROOT_REAL, 'index.html'), 'utf8').replace('</body>', '<script src="engine/video/player.js"></script>\n</body>');
+        res.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' });
+        return res.end(req.method === 'HEAD' ? undefined : html);
+      }
       const f = (req.method === 'GET' || req.method === 'HEAD') ? resolveSafe(req.url) : null;
       if (!f) { res.writeHead(404); return res.end(); }
       res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
@@ -173,10 +197,10 @@ async function evaluate(c, expr) {
   return r.result.value;
 }
 
-async function openWorker(tag) {
+async function openWorker(tag, url = PAGE) {
   const { proc, ws, dir } = await launch();
   try {
-    return await attach(proc, ws, dir, tag);
+    return await attach(proc, ws, dir, tag, url);
   } catch (e) {
     killChrome(proc);
     launched.delete(proc);
@@ -184,12 +208,12 @@ async function openWorker(tag) {
   }
 }
 
-async function attach(proc, ws, dir, tag) {
+async function attach(proc, ws, dir, tag, url) {
   const c = await cdp(ws, tag);
   await c.send('Runtime.enable');
   await c.send('Page.enable');
   await c.send('Log.enable');
-  await c.send('Page.navigate', { url: PAGE + '?v=' + Date.now() });
+  await c.send('Page.navigate', { url: url + (url.includes('#') ? '' : '?v=' + Date.now()) });
   for (let i = 0; i < 300; i++) {
     try { if (await evaluate(c, 'window.READY === true')) break; } catch (e) { /* loading */ }
     await sleep(50);
@@ -312,6 +336,44 @@ const BOARD_JS = `(async (items, cols) => {
   return b.toDataURL('image/png');
 })`;
 
+// Audition sheet: every character in globalThis.CAST (a film can set it: { name: style }), else the
+// Ch.STYLES presets + the Claude mascot, each in 6 expressions/poses on one labelled sheet.
+const CAST_JS = `(() => {
+  const G = globalThis.G, Ch = globalThis.Ch;
+  G.setTime(0);
+  const cast = Object.entries(globalThis.CAST || Object.assign({}, Ch.STYLES, { claude: 'claude' }));
+  const cells = [
+    ['neutral', { eyes: 'normal', mouth: 'smile' }],
+    ['happy', { eyes: 'happy', mouth: 'grin', blush: 0.6 }],
+    ['surprised', { eyes: 'wide', mouth: 'o', brows: 'up' }],
+    ['worried', { eyes: 'normal', mouth: 'wavy', brows: 'worried', sweat: 1 }],
+    ['cheering', { eyes: 'happy', mouth: 'open', handL: [-150, -560], handR: [150, -560], armL: 1.3, armR: 1.3 }],
+    ['sitting, waving', { pose: 'sit', eyes: 'normal', mouth: 'smile', handR: [120, -330] }],
+  ];
+  const cw = 300, ch = 400, lw = 190;
+  const b = document.createElement('canvas');
+  b.width = lw + cells.length * cw; b.height = 50 + cast.length * ch;
+  const x = b.getContext('2d');
+  x.fillStyle = '#F4EDE0'; x.fillRect(0, 0, b.width, b.height);
+  x.fillStyle = '#6B6158'; x.font = '600 20px system-ui, sans-serif';
+  cells.forEach(([n], j) => x.fillText(n, lw + j * cw + 20, 34));
+  cast.forEach(([name, style], i) => {
+    const y0 = 50 + i * ch;
+    x.fillStyle = i % 2 ? '#EFE6D6' : '#F4EDE0'; x.fillRect(0, y0, b.width, ch);
+    x.fillStyle = '#2A2320'; x.font = '800 24px system-ui, sans-serif'; x.fillText(name, 20, y0 + ch / 2);
+    cells.forEach(([, o], j) => {
+      const cx = lw + j * cw + cw / 2;
+      if (o.pose === 'sit') { x.fillStyle = '#8E6444'; x.fillRect(cx - 95, y0 + ch - 148, 190, 22); x.fillRect(cx - 85, y0 + ch - 126, 16, 96); x.fillRect(cx + 69, y0 + ch - 126, 16, 96); }
+      if (style === 'claude') {
+        const mouth = { smile: 'smile', grin: 'smile', o: 'o', wavy: 'none', open: 'open' }[o.mouth];
+        const eyes = o.brows === 'worried' ? 'worried' : o.eyes;
+        Ch.claude(x, { x: cx, y: o.pose === 'sit' ? y0 + ch - 148 : y0 + ch - 50, s: 0.85, eyes, mouth, blush: o.blush || 0.3, armL: o.armL || 0.2, armR: o.armR || 0.2 });
+      } else Ch.person(x, Object.assign({ x: cx, y: o.pose === 'sit' ? y0 + ch - 148 : y0 + ch - 30, s: 0.72, pose: 'stand', style, seed: 17 + i * 7 }, o));
+    });
+  });
+  return b.toDataURL('image/png');
+})()`;
+
 // ---------- verify: does the sound AND the picture hit every sync marker? ----------
 // Reads the FINAL file (what viewers get): decodes the picture at 96x54 grey and the sound as mono.
 // Picture: the frame with the biggest change near the marker (a cut, flash, stamp, pop…) must be the
@@ -428,11 +490,12 @@ async function main() {
     }
     return;
   }
-  if (!['stills', 'sheet', 'board', 'clip', 'video'].includes(mode)) {
-    console.log('usage: node engine/render.js stills|sheet|board|clip|video|mux|check|verify ...');
+  if (!['stills', 'sheet', 'board', 'clip', 'video', 'preview', 'cast'].includes(mode)) {
+    console.log('usage: node engine/render.js stills|sheet|board|clip|video|mux|check|verify|preview|cast ...');
     return;
   }
   const times = mode === 'stills' || mode === 'board' ? args.map(parseTime) : null; // fail on a bad time BEFORE launching Chrome
+  lintDeterminism();
   await serve();
   if (mode === 'stills') {
     const w = await openWorker('w0');
@@ -475,13 +538,44 @@ async function main() {
     w.close();
     fs.writeFileSync(path.join(OUT, 'board.png'), Buffer.from(url.slice(url.indexOf(',') + 1), 'base64'));
     console.log(`board written: out/board.png (${items.length} frames)`);
+  } else if (mode === 'preview') {
+    // the film + its music in the browser, live. Keeps serving until Ctrl+C (only this process: no fixed port).
+    const pos = args.filter((a) => !a.startsWith('--'));
+    const start = pos[0] ? Math.max(0, Math.min(DURATION, parseTime(pos[0]))) : 0;
+    const url = `${PAGE.replace(/index\.html$/, '')}__preview#t=${start.toFixed(3)}`;
+    if (!fs.existsSync(path.join(OUT, 'music.wav'))) console.log('(no out/music.wav yet: run node song.js first for sound)');
+    if (args.includes('--check')) {
+      // headless self-test: the player loads, decodes the music, draws, and seeks; screenshot -> out/preview.png
+      const w = await openWorker('preview', url);
+      let st = null;
+      for (let i = 0; i < 200 && !st; i++) { st = await evaluate(w.c, 'window.PREVIEW_READY || null'); if (!st) await sleep(50); }
+      if (!st) throw new Error('preview page never became ready');
+      await evaluate(w.c, `window.__pv.seek(${(DURATION * 0.6).toFixed(3)})`);
+      await sleep(400);
+      const shot = await w.c.send('Page.captureScreenshot', { format: 'png' });
+      fs.writeFileSync(path.join(OUT, 'preview.png'), Buffer.from(shot.data, 'base64'));
+      w.close();
+      console.log(`preview OK: ${JSON.stringify(st)}  (screenshot: out/preview.png)`);
+      if (st.film !== true) throw new Error('the film never became ready in the preview');
+      return;
+    }
+    console.log(`\npreview with sound → ${url}\n\nOpen it in Chrome and click Play. Keys: space play/pause · ←/→ beat · shift+←/→ bar · [ ] marker · L loop section.\nAfter editing score.js / film.js: reload the page. After editing song.js: node song.js, then reload.\nCtrl+C stops the preview server.`);
+    await new Promise(() => {}); // serve until interrupted
+  } else if (mode === 'cast') {
+    const w = await openWorker('w0');
+    const url = await evaluate(w.c, CAST_JS);
+    w.close();
+    fs.writeFileSync(path.join(OUT, 'cast.png'), Buffer.from(url.slice(url.indexOf(',') + 1), 'base64'));
+    console.log('cast sheet written: out/cast.png');
   } else if (mode === 'clip') {
     // a section with sound: fast JPEG frames + the matching slice of out/music.wav
-    if (args.length < 2) throw new Error('usage: node engine/render.js clip <from> <to> [workers]   e.g. clip @drop-2 @drop+3');
-    const a = Math.max(0, parseTime(args[0])), b = Math.min(DURATION, parseTime(args[1]));
+    const gif = args.includes('--gif');
+    const cargs = args.filter((x) => !x.startsWith('--'));
+    if (cargs.length < 2) throw new Error('usage: node engine/render.js clip <from> <to> [workers] [--gif]   e.g. clip @drop-2 @drop+3');
+    const a = Math.max(0, parseTime(cargs[0])), b = Math.min(DURATION, parseTime(cargs[1]));
     if (!(b > a)) throw new Error(`clip range is empty: ${a.toFixed(2)}s → ${b.toFixed(2)}s`);
     const f0 = Math.ceil(a * FPS - 1e-6), f1 = Math.ceil(b * FPS - 1e-6);
-    const workers = parseInt(args[2] || String(Math.max(2, os.cpus().length - 1)), 10);
+    const workers = parseInt(cargs[2] || String(Math.max(2, os.cpus().length - 1)), 10);
     const name = `clip_${(f0 / FPS).toFixed(2)}-${(f1 / FPS).toFixed(2)}.mp4`;
     const silent = path.join(OUT, `.clip-${process.pid}.mp4`);
     process.on('exit', () => fs.rmSync(silent, { force: true }));
@@ -496,6 +590,13 @@ async function main() {
       console.log('(no out/music.wav yet: run node song.js for sound)');
     }
     console.log(`out/${name} done in ${secs.toFixed(1)}s (${frames} frames${fs.existsSync(wav) ? ', with sound' : ''})`);
+    if (gif) {
+      // a shareable GIF (no sound): 12 fps, 480 px on the short side, one optimised palette
+      const g = dest.replace(/\.mp4$/, '.gif');
+      const scale = PORTRAIT ? 'scale=480:-2:flags=lanczos' : 'scale=-2:480:flags=lanczos';
+      execFileSync(FFMPEG, ['-v', 'error', '-y', '-i', dest, '-vf', `fps=12,${scale},split[a][b];[a]palettegen=max_colors=160:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle`, '-loop', '0', g]);
+      console.log(`out/${path.basename(g)} (${(fs.statSync(g).size / 1e6).toFixed(1)} MB)`);
+    }
   } else if (mode === 'video') {
     const workers = parseInt(args[0] || String(Math.max(2, os.cpus().length - 1)), 10);
     const { frames, secs } = await renderRange(0, Math.round(DURATION * FPS), workers, path.join(OUT, 'video.mp4'));

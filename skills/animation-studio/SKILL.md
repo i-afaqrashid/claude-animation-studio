@@ -1,7 +1,7 @@
 ---
 name: animation-studio
 description: This skill should be used when the user asks to "make an animated video about X with music", "make a cartoon / animated short", "animate this story", "make a video like the Opus animations", "make an explainer animation", "make a promo video for my app / brand", or "make an animated Reel / TikTok / Short" — a new hand-drawn 2D film where every frame is drawn in code and the soundtrack is synthesized in code, synced from one score, delivered as a 1080p MP4 in 16:9, 9:16, 1:1 or 4:5. Not for CSS/web/UI animation, Lottie/SVG/GIF assets, editing or adding music to an existing video, or Remotion/Manim projects.
-version: 0.4.0
+version: 0.5.0
 ---
 
 # Animation Studio
@@ -78,7 +78,7 @@ Render parts into buses (`drums, bass, pad, keys, brass, choir, crowd, fx`), add
 
 For acoustic colour there are `I.guitar(midi, dur, {bright, sustain})` (a plucked string, in tune to a fraction of a cent) and `I.epiano(midi, dur)` (a warm FM electric piano); call-and-response between them suits chats and conversations.
 
-**The model cannot hear the result, so measure it.** Run `STEMS=1 node song.js && node engine/tools/levels.js out/music.wav out/stem-*.wav` for RMS/peak per stem per section. Then compare against the targets in the cookbook: for a big-payoff film, a quiet intro around -19 dB RMS, the drop around -11, and any silence truly `-inf`; tender films stay gentler throughout. Check the integrated loudness (-14 to -11 LUFS) with ffmpeg `ebur128`. `MIX.master` limits the true peak to -1.5 dBTP, so the file will not clip when platforms re-encode it. Render spectrograms (`showspectrumpic`) and read them to confirm structure: notes, silences, and drums entering where planned. Fix balance with the `GAIN` table, not by guessing.
+**The model cannot hear the result, so measure it.** Run `STEMS=1 node song.js && node engine/tools/levels.js out/music.wav out/stem-*.wav` for RMS/peak per stem per section. Then compare against the targets in the cookbook: for a big-payoff film, a quiet intro around -19 dB RMS, the drop around -11, and any silence truly `-inf`; tender films stay gentler throughout. Check the integrated loudness (-14 to -11 LUFS): `levels.js` prints it. To hit an exact loudness, run `LUFS=-14 node song.js`, which makes `MIX.master` solve for it (use -14 for YouTube/Spotify-normalised platforms, -12 to -11 for X and feeds). `MIX.master` also limits the true peak to -1.5 dBTP, so the file will not clip when platforms re-encode it. Render spectrograms (`showspectrumpic`) and read them to confirm structure: notes, silences, and drums entering where planned. Fix balance with the `GAIN` table, not by guessing.
 
 ### 5. Write `film.js`
 
@@ -94,9 +94,11 @@ cd <target-dir> && node engine/render.js sheet 0 <DURATION> 30 6  # 30 frames ac
 cd <target-dir> && node engine/render.js clip @drop-2 @drop+3     # that section WITH sound -> out/clip_*.mp4
 ```
 
-Read the PNGs and critique every shot: legibility, faces hidden by props, colours too dark or muddy, overlapping text, poses that read wrong (seated vs standing), elbows bending inward, clutter. Also check transitions and hand-offs (a frame just before and after each cut), because that is where overlaps and half-drawn wipes hide. Fix, then re-render the same times. Use `clip` to judge timing and motion on one section in seconds instead of re-rendering the whole film.
+Read the PNGs and critique every shot: legibility, faces hidden by props, colours too dark or muddy, overlapping text, poses that read wrong (seated vs standing), elbows bending inward, clutter. Also check transitions and hand-offs (a frame just before and after each cut), because that is where overlaps and half-drawn wipes hide. Fix, then re-render the same times. Use `clip` to judge timing and motion on one section in seconds instead of re-rendering the whole film. Before animating people, run `node engine/render.js cast` and read `out/cast.png`: every character from `globalThis.CAST` (set it in film.js: `{ name: style }`), each in 6 expressions and poses. Hidden eyes, clashing colours and poses that don't read show up here first. Render commands also warn if a film file uses `Math.random`, `Date.now` or `performance.now`; fix those, because frames must be a pure function of t.
 
-Before the full render, run `node engine/render.js board` (every marker as one labelled storyboard, `out/board.png`), give the user its path along with the music measurements, and let them approve or redirect. The full render costs minutes; a change of mind after it costs a second render.
+**Let the user watch and listen before the full render.** Run `node engine/render.js preview` with `run_in_background: true` and give the user the printed `http://127.0.0.1:<port>/__preview` link. It plays the music and draws the film live, with a timeline of sections and markers (space play, ←/→ beat, [ ] marker, L loop section). You can't watch it yourself (`preview --check` only tests that it loads). The port is OS-assigned, never a fixed one like 3000. When they're done, stop that background task, and only that one.
+
+Before the full render, run `node engine/render.js board` (every marker as one labelled storyboard, `out/board.png`), give the user its path, the preview link and the music measurements, and let them approve or redirect. The full render costs minutes; a change of mind after it costs a second render.
 
 ### 7. Render, mux, verify
 
@@ -108,7 +110,7 @@ cd <target-dir> && node engine/render.js check      # -> out/check-sheet.png + l
 cd <target-dir> && node engine/render.js verify     # sound + picture measured at every sync marker (exit 1 if off)
 ```
 
-`video` verifies the encoded frame count and `mux` verifies the final file has picture + sound at the right duration; any ffmpeg failure stops the run with an error. `render.js video` runs for minutes (about 7 min for 58s on 8 cores), longer than the Bash tool's default 2-minute timeout. Launch it with `run_in_background: true`, check its `frames … eta` output, and wait for `out/video.mp4 done` before running `mux`. After the final file exists, cut 10fps strips around fast moments: `ffmpeg -ss <t> -t 1.2 -i out/<name>.mp4 -vf "fps=10,scale=480:-1,tile=4x3" -frames:v 1 out/strip.png`. `verify` decodes the final MP4 and, for each `sync` marker, finds the steepest rise in the sound (must be within ±20 ms) and the biggest change in the picture (must be the first frame at or after the marker, ±1 frame). A ✗ means one side is late: fix it in `score.js`, never by nudging one side by hand. A `?` means nothing distinct happens there; make the moment a clear hit or drop its `sync` flag.
+`video` verifies the encoded frame count and `mux` verifies the final file has picture + sound at the right duration; any ffmpeg failure stops the run with an error. `render.js video` runs for minutes (about 7 min for 58s on 8 cores), longer than the Bash tool's default 2-minute timeout. Launch it with `run_in_background: true`, check its `frames … eta` output, and wait for `out/video.mp4 done` before running `mux`. For sharing, `clip @drop-2 @drop+2 --gif` also writes a GIF (480px on the short side, 12fps). After the final file exists, cut 10fps strips around fast moments: `ffmpeg -ss <t> -t 1.2 -i out/<name>.mp4 -vf "fps=10,scale=480:-1,tile=4x3" -frames:v 1 out/strip.png`. `verify` decodes the final MP4 and, for each `sync` marker, finds the steepest rise in the sound (must be within ±20 ms) and the biggest change in the picture (must be the first frame at or after the marker, ±1 frame). A ✗ means one side is late: fix it in `score.js`, never by nudging one side by hand. A `?` means nothing distinct happens there; make the moment a clear hit or drop its `sync` flag.
 
 ### 8. Deliver
 
@@ -143,5 +145,5 @@ Report the output path, duration, resolution and size. Explain the sync gimmicks
 ### Scripts
 - **`scripts/new-project.js`**: scaffold a project (engine + template or example; `--format 9:16|1:1|4:5`, `--from app-promo`) with a preflight check
 - **`scripts/smoke-test.js`**: end-to-end engine check (true-peak limiter, render, mux, markers, board, clip, verify, a crashing ffmpeg, two renders in one folder); run it after changing the engine
-- **`engine/render.js`**: `stills | sheet | board | clip | video | mux | check | verify`; times as seconds, `bar:beat` or `@marker±sec`
+- **`engine/render.js`**: `stills | sheet | board | clip [--gif] | preview | cast | video | mux | check | verify`; times as seconds, `bar:beat` or `@marker±sec`
 - **`engine/tools/levels.js`**: per-section RMS/peak meter for the mix and stems

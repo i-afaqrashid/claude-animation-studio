@@ -18,6 +18,9 @@ flash         27.167s    27.167s +0ms ✓        27.200s +1f ✓
 ```
 Reading it: sound ±20 ms and picture ±1 frame pass. The picture counts the pixels that change a lot from one frame to the next, so cuts, flashes, stamps and pops stand out while fades and grain don't. It can land one frame late after a white flash (the flash frame differs less from a bright scene than the frame after it does) or one frame early when motion accelerates INTO the hit (a lid slamming shut). ✗ = a real offset: move the event in `score.js` so both sides read the same time. `?` = no distinct hit near the marker (a small pop in a busy frame, a note buried in the mix): make the moment clearer, or give it `sync: 'a'` / `'v'` / no sync.
 
+## Preview with sound (for the user)
+`node engine/render.js preview` (run in the background) prints a localhost link; the user opens it in Chrome and clicks Play. The film draws live at the audio clock: heavy shots may drop frames in the preview (the fps readout says so) but the final render never does. After editing score.js or film.js the user reloads the page; after song.js, re-run `node song.js` first. Stop only the preview task you started.
+
 ## Performance
 - About 300ms per frame per worker for heavy scenes. 7 workers on 8 cores: a 58s film in ~7–8 min. Always run `video` with `run_in_background: true` (it exceeds the 2-minute Bash timeout).
 - Pre-render static heavy textures once (crowds, scanlines, grain tiles) in `Studio.film({ init })`.
@@ -54,6 +57,8 @@ Reading it: sound ±20 ms and picture ±1 frame pass. The picture counts the pix
 | A 9:16 film has text under the platform's buttons/caption | laid out for the full frame | keep text, faces and logos inside `G.SAFE`; put ground/tables in the bottom 22% |
 | `verify` says a logo is 2 frames early after a circle wipe | the wipe's last frames change more pixels than a small logo popping in | close the wipe AT the marker and hard-cut to the end card there (`app-promo` does this) |
 | The status bar vanishes on a dark app screen | dark text on dark | `UI.phone(…, { dark: true })` for camera/dark screens |
+| Workers render different frames for the same t (flicker, jumping confetti) | `Math.random()` / `Date.now()` in a film file | seeded `U.mulberry32` in score.js, `U.hash(i, t)` in film.js; render commands now warn about these |
+| Emotions don't read on a character | sunglasses/hair over the eyes, or all expressions look alike | `render.js cast`: 6 expressions side by side; take the glasses off for emotional beats |
 
 ## Etiquette on the user's machine
 - Never kill processes the renderer did not start (another session may be rendering), and never touch the user's dev servers or ports (e.g. 3000).

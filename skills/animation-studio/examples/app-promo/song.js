@@ -116,6 +116,7 @@ const mix = MIX.mixdown(stems, GAIN, { stemDir: process.env.STEMS ? out : null }
 MIX.highpass(mix, 22);
 MIX.gate(mix, ev.breath[0], ev.breath[1]);
 MIX.fadeOut(mix, DURATION - 1.4, DURATION);
-MIX.master(mix, parseFloat(process.env.DRIVE || '0.8'));
+// LUFS=-14 node song.js masters to an exact loudness (-14 suits YouTube/Spotify-normalised platforms)
+const M = MIX.master(mix, parseFloat(process.env.DRIVE || '0.8'), undefined, { lufs: process.env.LUFS ? parseFloat(process.env.LUFS) : null });
 MIX.writeWav(path.join(out, 'music.wav'), mix);
-console.log(`wrote out/music.wav (${DURATION.toFixed(2)}s)`);
+console.log(`wrote out/music.wav (${DURATION.toFixed(2)}s${M.lufs !== undefined ? `, ${M.lufs.toFixed(1)} LUFS at drive ${M.drive.toFixed(2)}` : ''})`);

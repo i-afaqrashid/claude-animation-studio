@@ -35,3 +35,5 @@ for (const f of files) {
   }
   console.log(row);
 }
+// integrated loudness of the first file (BS.1770, same meter as MIX.master's { lufs } target)
+try { console.log(`\nintegrated loudness (${path.basename(files[0])}): ${require(path.join(__dirname, '..', 'audio', 'mix')).lufs(read(files[0])).toFixed(1)} LUFS`); } catch (e) { /* not a float WAV */ }

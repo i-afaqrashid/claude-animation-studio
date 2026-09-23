@@ -32,6 +32,8 @@ All fields are optional; defaults draw the original jersey look.
 
 Acting parameters (per frame, not style): `eyes`, `brows`, `mouth` (`flat wavy smile smirk grin open o sleep`), `look`, `lookY`, `blink`, `headRot`, `handL`/`handR` hand targets, `crossArms`, `knee`, `pillow`, `sweat`, `blush`, `legBend`, `scarf`, `blanket`.
 
+Audition before animating: set `globalThis.CAST = { hero: {...}, friend: {...} }` in film.js and run `node engine/render.js cast`. `out/cast.png` shows each character neutral, happy, surprised, worried, cheering, and sitting + waving.
+
 When personalizing for a real viewer, ask for (or read from a photo they share) hair style and colour, facial hair, glasses, skin tone, typical clothing and one signature pose. Map each to the table above, and keep the cartoon kind and flattering. Never store or publish the photo itself; only the style description goes into code.
 
 ## 3. Building a new character from primitives

@@ -62,10 +62,58 @@ function truePeakAt(x, i) {
   return pk;
 }
 
+// Integrated loudness in LUFS (ITU-R BS.1770 / EBU R128): K-weighting (a high shelf + a high pass,
+// 48 kHz coefficients), 400 ms blocks every 100 ms, an absolute gate at -70 LUFS and a relative gate
+// 10 LU below. Matches ffmpeg's ebur128 to within ~0.1 LU.
+function lufs(b) {
+  const N = b.n, block = Math.round(0.4 * SR), hop = Math.round(0.1 * SR);
+  const kw = (x) => {
+    const y = new Float64Array(x.length);
+    let x1 = 0, x2 = 0, y1 = 0, y2 = 0, z1 = 0, z2 = 0, w1 = 0, w2 = 0;
+    for (let i = 0; i < x.length; i++) {
+      const v = 1.53512485958697 * x[i] - 2.69169618940638 * x1 + 1.19839281085285 * x2 + 1.69065929318241 * y1 - 0.73248077421585 * y2;
+      x2 = x1; x1 = x[i]; y2 = y1; y1 = v;
+      const u = v - 2 * z1 + z2 + 1.99004745483398 * w1 - 0.99007225036621 * w2;
+      z2 = z1; z1 = v; w2 = w1; w1 = u;
+      y[i] = u * u;
+    }
+    return y;
+  };
+  const L = kw(b.L), R = kw(b.R);
+  const cum = new Float64Array(N + 1);
+  for (let i = 0; i < N; i++) cum[i + 1] = cum[i] + L[i] + R[i];
+  const zs = [];
+  for (let s = 0; s + block <= N; s += hop) zs.push((cum[s + block] - cum[s]) / block);
+  const ld = (z) => -0.691 + 10 * Math.log10(z + 1e-20);
+  const abs = zs.filter((z) => ld(z) > -70);
+  if (!abs.length) return -Infinity;
+  const rel = ld(abs.reduce((a, z) => a + z, 0) / abs.length) - 10;
+  const g = abs.filter((z) => ld(z) > rel);
+  return ld(g.reduce((a, z) => a + z, 0) / g.length);
+}
+
 // Glue compressor + 4ms lookahead brickwall limiter. drive ~0.8 lands near -13 LUFS for a busy mix.
 // ceiling is a TRUE-peak ceiling: 0.84 ≈ -1.5 dBTP, so uploads (AAC, platform resampling) never clip.
 // { truePeak: false } restores the old sample-peak limiter (v0.2 behaviour, used with ceiling 0.93).
-function master(b, drive = 0.8, ceiling = 0.84, { truePeak = true } = {}) {
+// { lufs: -14 } finds the drive that lands the master at that integrated loudness (±0.2 LU) instead.
+function master(b, drive = 0.8, ceiling = 0.84, { truePeak = true, lufs: target = null } = {}) {
+  if (target !== null && target !== undefined && Number.isFinite(target)) {
+    const src = { L: Float32Array.from(b.L), R: Float32Array.from(b.R), n: b.n };
+    let d = drive, got = 0;
+    for (let k = 0; k < 6; k++) {
+      b.L.set(src.L); b.R.set(src.R);
+      masterOnce(b, d, ceiling, truePeak);
+      got = lufs(b);
+      if (Math.abs(got - target) <= 0.2) break;
+      d *= Math.pow(10, (target - got) / 20) * (got < target ? 1.05 : 1); // limiting eats part of every boost
+    }
+    master.last = { drive: d, lufs: got };
+    return master.last;
+  }
+  masterOnce(b, drive, ceiling, truePeak);
+  return { drive };
+}
+function masterOnce(b, drive, ceiling, truePeak) {
   const N = b.n;
   let env = 0;
   for (let i = 0; i < N; i++) {
@@ -130,4 +178,4 @@ function mixdown(stems, gains, { stemDir = null } = {}) {
   return out;
 }
 
-module.exports = { sidechain, gate, fadeOut, highpass, master, writeWav, mixdown };
+module.exports = { sidechain, gate, fadeOut, highpass, master, lufs, writeWav, mixdown };

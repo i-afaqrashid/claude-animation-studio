@@ -12,6 +12,7 @@
   const COOK = { hairStyle: 'curly', hair: '#2B211E', skin: '#C98A62', glasses: 'round', outfit: 'tee', shirt: '#2E9E6B', bottoms: 'pants', shorts: '#2B2F45' };
   const FRIEND = { hairStyle: 'bun', hair: '#5A3A22', skin: '#E6B48C', outfit: 'hoodie', shirt: '#F4B72E', bottoms: 'pants', shorts: '#3A3F5C' };
   const hop = (t, amp) => amp * Math.sin(Math.PI * clock.phase(t)); // 0 on every beat
+  globalThis.CAST = { cook: COOK, friend: FRIEND }; // `render.js cast` auditions these
 
   // ---------- food (hand-drawn: it lives in the real world, even inside the camera) ----------
   function food(ctx, kind, x, y, s, seed = 1) {

@@ -6,6 +6,7 @@
 //   3. an ffmpeg that crashes mid-stream makes the render FAIL cleanly (no hang, no leftover Chrome)
 //   4. a second render in the same project folder is refused while the first one still succeeds
 //   5. formats: --format 9:16 renders 1080x1920 frames; the app-promo example (UI kit) scores and draws
+//   6. preview (headless self-test), cast sheet, clip --gif, an exact LUFS target, the Math.random warning
 // Usage: node <skill>/scripts/smoke-test.js        (takes ~2–4 minutes; needs Node 22+, ffmpeg, Chrome)
 const fs = require('fs');
 const os = require('os');
@@ -69,11 +70,11 @@ const probe = (file) => JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-sho
   pass('an unknown @marker fails fast with a clear message', badT.code !== 0 && /unknown marker @nope/.test(badT.out) && badT.secs < 10, `exit ${badT.code} in ${badT.secs.toFixed(1)}s`);
   const board = run(['engine/render.js', 'board']);
   pass('board → labelled storyboard of the markers', board.code === 0 && fs.existsSync(path.join(proj, 'out', 'board.png')), board.code ? board.out.slice(-300) : '');
-  const clip = run(['engine/render.js', 'clip', '@land-0.5', '@land+0.5', '2']);
+  const clip = run(['engine/render.js', 'clip', '@land-0.5', '@land+0.5', '2', '--gif']);
   const clipFile = path.join(proj, 'out', 'clip_4.00-5.00.mp4');
-  let clipOk = clip.code === 0 && fs.existsSync(clipFile);
+  let clipOk = clip.code === 0 && fs.existsSync(clipFile) && fs.existsSync(clipFile.replace(/\.mp4$/, '.gif'));
   if (clipOk) { const p = probe(clipFile); clipOk = p.streams.some((x) => x.codec_type === 'audio') && Math.abs(parseFloat(p.format.duration) - 1) < 2 / FPS; }
-  pass('clip @land-0.5 @land+0.5 → 1s preview with sound', clipOk, clip.code ? clip.out.slice(-300) : '');
+  pass('clip @land-0.5 @land+0.5 --gif → 1s preview with sound + a GIF', clipOk, clip.code ? clip.out.slice(-300) : '');
   const ver = run(['engine/render.js', 'verify']);
   pass('verify: sound and picture hit @land', ver.code === 0 && /land .*✓.*✓/.test(ver.out) && /✓ in sync/.test(ver.out), ver.out.split('\n').filter((l) => /land|sync/.test(l)).join(' | '));
   const goodScore = fs.readFileSync(scorePath, 'utf8');
@@ -120,6 +121,23 @@ const probe = (file) => JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-sho
   const pb = ps && ps.status === 0 && spawnSync(process.execPath, ['engine/render.js', 'board'], { cwd: promo, encoding: 'utf8' });
   const pbOut = pb ? pb.stdout + pb.stderr : '';
   pass('app-promo example: music + storyboard of every marker (UI kit, 9:16)', !!pb && pb.status === 0 && /board written: out\/board\.png \(9 frames\)/.test(pbOut) && !/EXCEPTION/.test(pbOut), pbOut.slice(-300) || (ps ? ps.stdout + ps.stderr : sp.stdout + sp.stderr).slice(-300));
+
+  // 6. preview, cast, LUFS target, determinism warning (on the first smoke film)
+  const pv = run(['engine/render.js', 'preview', '@land', '--check'], { timeout: 120000 });
+  const pvState = /preview OK: (\{.*\})/.exec(pv.out);
+  const pvj = pvState ? JSON.parse(pvState[1]) : {};
+  pass('preview --check: the player decodes the music and draws the film', pv.code === 0 && pvj.film === true && Math.abs(pvj.audio - DURATION) < 0.05 && fs.existsSync(path.join(proj, 'out', 'preview.png')), pv.code ? pv.out.slice(-300) : JSON.stringify(pvj));
+  const cast = run(['engine/render.js', 'cast']);
+  pass('cast → audition sheet of the characters', cast.code === 0 && fs.existsSync(path.join(proj, 'out', 'cast.png')), cast.code ? cast.out.slice(-300) : '');
+  const loud = run(['song.js'], { env: { LUFS: '-14' } });
+  const lm = spawnSync('ffmpeg', ['-hide_banner', '-nostats', '-i', path.join(proj, 'out', 'music.wav'), '-af', 'ebur128', '-f', 'null', '-'], { encoding: 'utf8' });
+  const li = parseFloat((/I:\s+(-?[\d.]+) LUFS/.exec(lm.stderr.slice(lm.stderr.lastIndexOf('Summary:'))) || [])[1]);
+  pass('LUFS=-14 node song.js lands at -14 LUFS (measured by ffmpeg)', loud.code === 0 && Math.abs(li + 14) <= 0.3, `${li} LUFS`);
+  const filmPath = path.join(proj, 'film.js'), goodFilm = fs.readFileSync(filmPath, 'utf8');
+  fs.writeFileSync(filmPath, goodFilm.replace('draw(ctx, t) {', 'draw(ctx, t) {\n      const jitter = Math.random();'));
+  const lint = run(['engine/render.js', 'stills', '1']);
+  fs.writeFileSync(filmPath, goodFilm);
+  pass('a film using Math.random() gets a determinism warning', /frames must be a pure function of t/.test(lint.out) && /film\.js:\d+/.test(lint.out), lint.out.slice(0, 200));
 
   const failed = results.filter((r) => !r.ok).length;
   console.log(`\n${results.length - failed}/${results.length} checks passed${failed ? '' : ' — engine OK'}`);
