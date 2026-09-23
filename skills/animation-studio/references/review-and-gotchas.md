@@ -41,8 +41,12 @@ Both must equal the score's timestamp (the World Cup film: 32.500s for both).
 | Chrome not found | non-standard install | `CHROME_PATH=/path/to/chrome node engine/render.js …` |
 | Crowd sounds like wind/rain | a filtered-noise bed alone | add formant-voice babble (music-cookbook) |
 | Mix is loud but flat (LRA < 3) | intro too loud / master overdriven | pull intro levels down, DRIVE ≈ 0.8 |
+| Chrome helper processes linger after a render | killing only the browser process | each Chrome gets its own process group; the whole group is killed (done) |
+| A render "finishes" with missing frames | an ffmpeg child failed silently | exit codes are checked and `video.mp4` frame count is verified against the score (done) |
+| A file next to the project could be served (`../film-evil/x`) | prefix check `startsWith(ROOT)` | path is resolved + realpath'd and must be inside `ROOT/` (done) |
+| Another render is already running | several Claude sessions can render at once | ports are OS-assigned so they never collide; never kill processes you didn't launch |
 
 ## Etiquette on the user's machine
-- Never kill processes the renderer did not start, and never touch the user's dev servers or ports (e.g. 3000).
+- Never kill processes the renderer did not start (another session may be rendering), and never touch the user's dev servers or ports (e.g. 3000).
 - Ask before git commits, pushes, creating repos, publishing, or installing plugins/tools.
 - Keep scratch work in the project's `out/` or a temp dir; don't modify unrelated files.

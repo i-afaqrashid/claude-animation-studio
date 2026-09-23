@@ -1,7 +1,7 @@
 ---
 name: animation-studio
 description: This skill should be used when the user asks to "make an animated video about X with music", "make a cartoon / animated short", "animate this story", "make a video like the Opus animations", or "make an explainer animation" — a new hand-drawn 2D film where every frame is drawn in code and the soundtrack is synthesized in code, synced from one score, delivered as a 1080p MP4. Not for CSS/web/UI animation, Lottie/SVG/GIF assets, editing or adding music to an existing video, or Remotion/Manim projects.
-version: 0.2.0
+version: 0.2.1
 ---
 
 # Animation Studio
@@ -85,7 +85,7 @@ cd <target-dir> && node engine/render.js mux        # -> out/<folder-name>.mp4 (
 cd <target-dir> && node engine/render.js check      # -> out/check-sheet.png + loudness / LRA / peak
 ```
 
-`render.js video` runs for minutes (about 7 min for 58s on 8 cores), longer than the Bash tool's default 2-minute timeout. Launch it with `run_in_background: true`, check its `frames … eta` output, and wait for `out/video.mp4 done` before running `mux`. After the final file exists, cut 10fps strips around fast moments: `ffmpeg -ss <t> -t 1.2 -i out/<name>.mp4 -vf "fps=10,scale=480:-1,tile=4x3" -frames:v 1 out/strip.png`. Verify sync numerically at the biggest hit: the audio onset and the brightest frame in the final MP4 must both land on the score's timestamp (commands in `references/review-and-gotchas.md`).
+`video` verifies the encoded frame count and `mux` verifies the final file has picture + sound at the right duration; any ffmpeg failure stops the run with an error. `render.js video` runs for minutes (about 7 min for 58s on 8 cores), longer than the Bash tool's default 2-minute timeout. Launch it with `run_in_background: true`, check its `frames … eta` output, and wait for `out/video.mp4 done` before running `mux`. After the final file exists, cut 10fps strips around fast moments: `ffmpeg -ss <t> -t 1.2 -i out/<name>.mp4 -vf "fps=10,scale=480:-1,tile=4x3" -frames:v 1 out/strip.png`. Verify sync numerically at the biggest hit: the audio onset and the brightest frame in the final MP4 must both land on the score's timestamp (commands in `references/review-and-gotchas.md`).
 
 ### 8. Deliver
 
@@ -99,7 +99,7 @@ Report the output path, duration, resolution and size. Explain the sync gimmicks
 - **Impact frames.** Put sunbursts *behind* characters by drawing them earlier in `draw()` (the example's film/room.js passes a `beforeChars` callback for this). Never draw thick black rays over faces.
 - **Silence before the payoff.** A half-beat of true silence (gate the master after the reverbs) plus a drained freeze frame makes the drop land twice as hard.
 - **Draw order.** Draw captions before full-screen wipes. After clipping to hatch, rebuild the path before stroking (the toolkit already does this).
-- **Safety on the user's machine.** The renderer binds an OS-assigned port and Chrome debug ports 9300–9700, and only kills the Chrome processes it launched. Never kill anything else. Never touch the user's dev servers or ports. Ask before git commits, pushes, publishing, or installing anything.
+- **Safety on the user's machine.** The renderer's file server and every Chrome debug port are OS-assigned (no fixed ports), it serves only files inside the project folder, and it only ever kills the Chrome process groups it launched itself. Never kill anything else; other Claude sessions may be rendering at the same time. Never touch the user's dev servers or ports. Ask before git commits, pushes, publishing, or installing anything.
 
 ## Additional Resources
 

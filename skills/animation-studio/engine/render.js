@@ -32,12 +32,26 @@ const CHROME = findChrome();
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.ttf': 'font/ttf', '.otf': 'font/otf', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.json': 'application/json' };
 let PAGE = null;
 // Serve over HTTP: Chrome refuses @font-face / FontFace loads from file:// URLs.
+// Only files INSIDE the project folder are served (checked after resolving symlinks), read-only, localhost only.
+const ROOT_REAL = fs.realpathSync(ROOT);
+const inside = (p) => p === ROOT_REAL || p.startsWith(ROOT_REAL + path.sep);
+function resolveSafe(url) {
+  let rel;
+  try { rel = decodeURIComponent(url.split('?')[0]); } catch (e) { return null; }
+  if (rel.includes('\0')) return null;
+  const f = path.resolve(ROOT_REAL, '.' + path.posix.normalize('/' + rel));
+  if (!inside(f) || !fs.existsSync(f)) return null;
+  const real = fs.realpathSync(f);
+  if (!inside(real) || fs.statSync(real).isDirectory()) return null;
+  return real;
+}
 function serve() {
   return new Promise((resolve) => {
     const srv = http.createServer((req, res) => {
-      const f = path.join(ROOT, decodeURIComponent(req.url.split('?')[0]));
-      if (!f.startsWith(ROOT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end(); }
+      const f = (req.method === 'GET' || req.method === 'HEAD') ? resolveSafe(req.url) : null;
+      if (!f) { res.writeHead(404); return res.end(); }
       res.writeHead(200, { 'Content-Type': MIME[path.extname(f)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
+      if (req.method === 'HEAD') return res.end();
       fs.createReadStream(f).pipe(res);
     });
     srv.listen(0, '127.0.0.1', () => { PAGE = `http://127.0.0.1:${srv.address().port}/index.html`; resolve(srv); });
@@ -46,24 +60,42 @@ function serve() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function launch(port) {
+// Every Chrome this script launches is tracked and killed on exit or failure — and ONLY those.
+// Each Chrome runs in its own process group, so killing the group takes its helper
+// processes (renderer, GPU, network) with it — nothing outside that group is ever touched.
+const launched = new Set();
+function killChrome(p) {
+  try { process.kill(-p.pid, 'SIGKILL'); } catch (e) { try { p.kill('SIGKILL'); } catch (e2) { /* already gone */ } }
+}
+function cleanup() { for (const p of launched) killChrome(p); launched.clear(); }
+process.on('exit', cleanup);
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { cleanup(); process.exit(130); });
+
+// Chrome picks its own free debugging port (--remote-debugging-port=0) and writes it to
+// <profile>/DevToolsActivePort, so the renderer never assumes any port is free.
+async function launch() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'anim-chrome-'));
   const proc = spawn(CHROME, [
-    '--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${dir}`,
+    '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${dir}`,
     '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--disable-extensions',
     '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows',
     '--force-device-scale-factor=1', '--window-size=1920,1080', 'about:blank',
-  ], { stdio: 'ignore' });
-  for (let i = 0; i < 150; i++) {
+  ], { stdio: 'ignore', detached: true });
+  launched.add(proc);
+  const portFile = path.join(dir, 'DevToolsActivePort');
+  for (let i = 0; i < 200; i++) {
+    if (proc.exitCode !== null) break;
     try {
+      const port = parseInt(fs.readFileSync(portFile, 'utf8').split('\n')[0], 10);
       const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
       const pg = list.find((x) => x.type === 'page');
       if (pg) return { proc, ws: pg.webSocketDebuggerUrl, dir };
     } catch (e) { /* not up yet */ }
     await sleep(100);
   }
-  proc.kill('SIGKILL');
-  throw new Error('chrome did not start');
+  killChrome(proc);
+  launched.delete(proc);
+  throw new Error(`chrome did not start (${CHROME})`);
 }
 
 function cdp(wsUrl, tag) {
@@ -101,19 +133,12 @@ async function evaluate(c, expr) {
   return r.result.value;
 }
 
-// Every Chrome this script launches is tracked and killed on exit or failure — and ONLY those.
-const launched = new Set();
-function cleanup() { for (const p of launched) { try { p.kill('SIGKILL'); } catch (e) { /* already gone */ } } launched.clear(); }
-process.on('exit', cleanup);
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { cleanup(); process.exit(130); });
-
-async function openWorker(port, tag) {
-  const { proc, ws, dir } = await launch(port);
-  launched.add(proc);
+async function openWorker(tag) {
+  const { proc, ws, dir } = await launch();
   try {
     return await attach(proc, ws, dir, tag);
   } catch (e) {
-    proc.kill('SIGKILL');
+    killChrome(proc);
     launched.delete(proc);
     throw e;
   }
@@ -134,7 +159,7 @@ async function attach(proc, ws, dir, tag) {
     c,
     close() {
       c.close();
-      proc.kill('SIGKILL');
+      killChrome(proc);
       launched.delete(proc);
       // Chrome may still be flushing its temp profile for a moment after the kill: retry, never crash
       try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); } catch (e) { /* leftover temp dir is harmless */ }
@@ -147,7 +172,10 @@ async function grab(w, t) {
   return Buffer.from(url.slice(url.indexOf(',') + 1), 'base64');
 }
 
-const basePort = 9300 + Math.floor(Math.random() * 400);
+function countFrames(file) {
+  const out = execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-count_packets', '-show_entries', 'stream=nb_read_packets', '-of', 'csv=p=0', file]).toString().trim();
+  return parseInt(out, 10);
+}
 const finalName = (arg) => path.join(OUT, `${arg || path.basename(ROOT)}.mp4`);
 
 async function main() {
@@ -157,7 +185,12 @@ async function main() {
     if (mode === 'mux') {
       execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', path.join(OUT, 'video.mp4'), '-i', path.join(OUT, 'music.wav'), '-map', '0:v', '-map', '1:a',
         '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-c:a', 'aac', '-b:a', '256k', '-shortest', file], { stdio: 'inherit' });
-      console.log('wrote', file);
+      const info = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration:stream=codec_type', '-of', 'json', file]).toString());
+      const types = info.streams.map((x) => x.codec_type);
+      const dur = parseFloat(info.format.duration);
+      if (!types.includes('video') || !types.includes('audio')) throw new Error(`${file} is missing a stream (has: ${types.join(', ')})`);
+      if (Math.abs(dur - DURATION) > 2 / FPS) throw new Error(`${file} lasts ${dur.toFixed(3)}s, expected ${DURATION.toFixed(3)}s`);
+      console.log(`wrote ${file} (video + audio, ${dur.toFixed(2)}s verified)`);
     } else {
       const rows = Math.max(1, Math.ceil(DURATION / 2 / 6));
       execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', file, '-vf', `fps=0.5,scale=480:-1,tile=6x${rows}:padding=4:color=white`, '-frames:v', '1', path.join(OUT, 'check-sheet.png')]);
@@ -170,7 +203,7 @@ async function main() {
   }
   await serve();
   if (mode === 'stills') {
-    const w = await openWorker(basePort, 'w0');
+    const w = await openWorker('w0');
     fs.mkdirSync(path.join(OUT, 'stills'), { recursive: true });
     for (const a of args) {
       const t = parseFloat(a);
@@ -181,7 +214,7 @@ async function main() {
     w.close();
   } else if (mode === 'sheet') {
     const [a = 0, b = DURATION, n = 16, cols = 4] = args.map(parseFloat);
-    const w = await openWorker(basePort, 'w0');
+    const w = await openWorker('w0');
     const dir = path.join(OUT, 'sheet');
     fs.rmSync(dir, { recursive: true, force: true });
     fs.mkdirSync(dir, { recursive: true });
@@ -204,10 +237,12 @@ async function main() {
     await Promise.all(Array.from({ length: workers }, async (_, k) => {
       const f0 = k * per, f1 = Math.min(total, f0 + per);
       if (f0 >= f1) return;
-      const w = await openWorker(basePort + 1 + k, 'w' + k);
+      const w = await openWorker('w' + k);
       const seg = path.join(segDir, `seg${String(k).padStart(2, '0')}.mp4`);
       const ff = spawn('ffmpeg', ['-v', 'error', '-y', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'png', '-i', '-',
         '-c:v', 'libx264', '-preset', 'medium', '-crf', '14', '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-g', '60', seg], { stdio: ['pipe', 'inherit', 'inherit'] });
+      const ffDone = new Promise((r) => { ff.on('close', (c) => r(c)); ff.on('error', () => r(-1)); });
+      ff.stdin.on('error', () => { /* ffmpeg died; its exit code is reported below */ });
       for (let f = f0; f < f1; f++) {
         const png = await grab(w, f / FPS);
         if (!ff.stdin.write(png)) await new Promise((r) => ff.stdin.once('drain', r));
@@ -217,13 +252,16 @@ async function main() {
         }
       }
       ff.stdin.end();
-      await new Promise((r) => ff.on('close', r));
+      const code = await ffDone;
       w.close();
+      if (code !== 0) throw new Error(`ffmpeg failed while encoding segment ${k} (exit code ${code})`);
     }));
     const list = fs.readdirSync(segDir).filter((f) => f.endsWith('.mp4')).sort().map((f) => `file '${path.join(segDir, f)}'`).join('\n');
     fs.writeFileSync(path.join(segDir, 'list.txt'), list);
     execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', path.join(segDir, 'list.txt'), '-c', 'copy', path.join(OUT, 'video.mp4')]);
-    console.log(`out/video.mp4 done in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+    const frames = countFrames(path.join(OUT, 'video.mp4'));
+    if (frames !== total) throw new Error(`out/video.mp4 has ${frames} frames, expected ${total}: a segment is missing or truncated`);
+    console.log(`out/video.mp4 done in ${((Date.now() - t0) / 1000).toFixed(1)}s (${frames} frames verified)`);
   } else {
     console.log('usage: node engine/render.js stills|sheet|video|mux|check ...');
   }

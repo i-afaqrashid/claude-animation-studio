@@ -40,4 +40,4 @@ Return a mono Float32Array unless noted.
 `Studio.film({ draw(ctx, t), post: {paper, vignette, grain} | fn(t), fadeOut = 1.6, init(ctx), duration })` · `Studio.loadImage('assets/x.png')` → Promise<Image> (await it in `init`). It loads the fonts, builds the textures, defines `window.renderAt(t)` (setTime → clear → draw → post → fade → PNG) and sets `window.READY`.
 
 ## render.js (run from the project root)
-`stills t1 t2 …` · `sheet t0 t1 n cols` · `video [workers]` · `mux [name]` · `check [name]`. Uses `CHROME_PATH` if set. It serves the project on an OS-assigned port, uses Chrome debug ports 9300–9700, and only kills the Chrome processes it launched.
+`stills t1 t2 …` · `sheet t0 t1 n cols` · `video [workers]` · `mux [name]` · `check [name]`. Uses `CHROME_PATH` if set. The file server and Chrome debug ports are OS-assigned (Chrome `--remote-debugging-port=0`, read back from `DevToolsActivePort`); only files inside the project are served (symlink- and prefix-safe); each Chrome runs in its own process group and only those groups are killed. `video` checks every ffmpeg exit code and the encoded frame count; `mux` checks streams and duration.
