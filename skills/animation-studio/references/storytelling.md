@@ -4,9 +4,11 @@
 
 At 120 BPM: 1 beat = 0.5s, 1 bar = 2s, 8th = 0.25s, 16th = 0.125s. A 30fps frame is 33ms, so 8ths land on frames exactly enough that nobody can tell. Pick a tempo first, then write the story as a bar map. Every cut goes on a bar line (or a strong beat for rapid-fire cuts). Keep a `OFFSET` of about 0.5s of black before bar 0 for a cold-open sound (TV click, a boing, a match strike).
 
-## Proven arcs
+## Story shapes
 
-### 58s emotional short (the World Cup film)
+Choose by the brief, not by habit. The silence-and-drop belongs to the big-payoff shape only.
+
+### Big payoff: 58s emotional short (the World Cup film)
 | bars | section | picture | music |
 |---|---|---|---|
 | 0–3 | intro | cold open, the hero alone, captions set the stakes | music box plays the hook softly, crowd murmur |
@@ -21,11 +23,34 @@ At 120 BPM: 1 beat = 0.5s, 1 bar = 2s, 8th = 0.25s, 16th = 0.125s. A 30fps frame
 | 24 | climax | high-five impact frame | final chord, big clap |
 | 25–28 | outro | calm aftermath, handwritten message, signature, heart | music box reprise, resolves to the tonic |
 
-### 20–30s micro (the template)
+### Big payoff, 20–30s micro (the template)
 intro 2 bars → groove 3.75 bars (gimmick builds up) → half-beat silence → drop 3 bars → outro 1–2 bars.
 
-### Explainer / product (30–45s)
-problem (minor key, sparse) → "what if" (riser) → reveal on the drop (brand colour sunburst) → 3 features, one per bar, each with its own sound → logo/handwritten sign-off on the tonic.
+### Comic escalation (20–40s, 130–150 BPM)
+| bars | picture | music |
+|---|---|---|
+| 0–1 | set up the character and the goal (the cat wants the cake) | bouncy pluck + light kick on 1 and 3 |
+| 2–3 | attempt 1: small, fails politely | melody phrase A; a "boing" or "bonk" on the fail |
+| 4–5 | attempt 2: bigger, fails bigger | phrase A a step higher, more drums; a bigger fail sound |
+| 6–7 | attempt 3: absurdly big | full band; everything speeds up (16th shakers) |
+| 7.5 | record-scratch stop; the character looks at camera | a stop plus a vinyl-scratch noise sweep |
+| 8–10 | the punchline, then a tiny happy ending | the hook resolves; a kazoo- or whistle-like lead; a "ta-da" button |
+Gimmicks: each attempt's crash lands on the downbeat; every bounce is a pluck note climbing the scale.
+
+### Tender memory (30–60s, 70–90 BPM)
+| section | picture | music |
+|---|---|---|
+| opening (2 bars) | one object, close up (a photo, a mug, a scarf) | a music box alone |
+| memories (3–4 short scenes, 2 bars each) | soft dissolves, warm lamp light, slow push-ins | pads enter; the melody passes between music box and soft keys |
+| the heart (2–4 bars) | the two characters together, a small gesture (a shared umbrella, a hand on a shoulder) | a key change up a step, or strings swelling; no drums, or brushes only |
+| ending (2 bars + tail) | a handwritten line, word by word, on notes | held maj9 chord, long reverb, fade |
+No silence gap, no drop, no screen shake. Use `G.photo` for real photos the user shares.
+
+### Montage (30–60s, 110–124 BPM)
+One shot per bar, cut on the downbeat; every 4 bars add an instrument (drums → bass → lead → choir). Each shot has one tiny action landing on beat 3 (a wave, a jump, confetti). End on a group shot and the hook's final note. No silence.
+
+### Musical explainer (30–45s, 100–110 BPM)
+Problem (minor key, sparse, 2 bars) → "what if" (a riser into the major key) → reveal (brand-colour sunburst) → 3–4 features, one per bar, each with its own sound and a caption stamped on beat 1 → a logo or handwritten sign-off on the tonic. A silence before the reveal is optional; skip it for calm brands.
 
 ## Sync gimmicks (the jaw-droppers)
 

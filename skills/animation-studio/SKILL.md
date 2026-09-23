@@ -1,7 +1,7 @@
 ---
 name: animation-studio
 description: This skill should be used when the user asks to "make an animated video about X with music", "make a cartoon / animated short", "animate this story", "make a video like the Opus animations", or "make an explainer animation" — a new hand-drawn 2D film where every frame is drawn in code and the soundtrack is synthesized in code, synced from one score, delivered as a 1080p MP4. Not for CSS/web/UI animation, Lottie/SVG/GIF assets, editing or adding music to an existing video, or Remotion/Manim projects.
-version: 0.2.1
+version: 0.2.2
 ---
 
 # Animation Studio
@@ -35,9 +35,19 @@ From the request, or with at most one round of questions, settle:
 
 Characters are never fixed. Use a preset (`Ch.STYLES.afaq`, `Ch.STYLES.afaqFan`), customize `Ch.person` (hair, facial hair, glasses, outfit, build, colours), or build new characters (pets, robots, products) from `G.*` primitives. The cat in `examples/characters/cat.js` is the worked example. When the user shares a photo of someone to feature, translate it into `style` options and never store the photo. Real images the user provides can appear as taped prints via `G.photo`. See `references/custom-characters.md`.
 
-### 1. Write the storyboard as music first
+### 1. Choose a story shape, then storyboard it as music
 
-Think in bars, not seconds. At 120 BPM, 1 beat = 0.5s and 1 bar = 2s. Map story beats to song sections before writing code: intro (quiet, 2–4 bars), rising action, tension (strip the drums, use a heartbeat), build (riser + accelerating snare roll), **a beat of total silence**, the drop/payoff (loudest, fullest), and a soft outro that reprises the hook. Put every scene cut on a bar line. Pick 3–5 **sync gimmicks** where the picture visibly makes the music, such as a ball that plays the melody, stars that are notes, or windows that light on 16ths. See `references/storytelling.md` for arcs, bar maps and a gimmick catalogue.
+Pick the shape that fits the brief instead of defaulting to one. Every shape keeps the core idea (the picture makes the music), but the pacing, tempo and instruments change:
+
+| shape | fits | pacing and music |
+|---|---|---|
+| **Big payoff** | sports, surprises, launches: any real "will it happen?" | quiet intro → tension → build → a beat of silence → loud drop → soft outro |
+| **Comic escalation** | birthdays, pets, mishaps | the same gag three times, each bigger; bouncy 130–150 BPM, staccato plucks, cartoon SFX; a record-scratch stop before the punchline |
+| **Tender memory** | anniversaries, thank-yous, farewells | 70–90 BPM, music box, pads, soft keys, no drums (or brushes); no drop; slow push-ins, warm light; ends on a held chord |
+| **Montage** | trips, a year in review, celebrations | a steady groove, one shot per bar, energy rising every 4 bars; no silence |
+| **Musical explainer** | products, ideas, how-tos | 100–110 BPM, one idea per bar, each with its own sound; ends on a sign-off |
+
+The silence-and-drop is a tool, not a signature: use it only when the story has a real moment of suspense. Think in bars, not seconds (at 120 BPM, 1 beat = 0.5s and 1 bar = 2s), and put scene cuts on bar lines. Pick 3–5 **sync gimmicks** where the picture visibly makes the music, such as a ball that plays the melody, stars that are notes, or windows that light on 16ths. See `references/storytelling.md` for a bar map per shape and the gimmick catalogue.
 
 Keep facts honest. If the film references real events whose details are unknown (a match result, a date), keep them fictional or generic.
 
@@ -59,9 +69,9 @@ Use `MUSIC.makeClock({ bpm, offset })` for `T(bar, beat)`, `placeBar` for 8th-no
 
 ### 4. Write `song.js` and measure it
 
-Render parts into buses (`drums, bass, pad, keys, brass, choir, crowd, fx`), add reverb/delay sends, sidechain pads and bass to the kick in energetic sections, then run `MIX.mixdown → highpass → gate (silence before the drop, applied after reverbs) → fadeOut → master → writeWav`. Instruments live in `engine/audio/instruments.js`. Recipes and mix targets are in `references/music-cookbook.md`.
+Render parts into buses (`drums, bass, pad, keys, brass, choir, crowd, fx`), add reverb/delay sends, sidechain pads and bass to the kick in energetic sections, then run `MIX.mixdown → highpass → gate (only if the shape uses a silence; applied after reverbs) → fadeOut → master → writeWav`. Instruments live in `engine/audio/instruments.js`. Recipes and mix targets are in `references/music-cookbook.md`.
 
-**The model cannot hear the result, so measure it.** Run `STEMS=1 node song.js && node engine/tools/levels.js out/music.wav out/stem-*.wav` for RMS/peak per stem per section. Then compare against the targets in the cookbook: quiet intro around -19 dB RMS, drop around -11, and silence truly `-inf`. Check the integrated loudness (-14 to -11 LUFS) with ffmpeg `ebur128`. Render spectrograms (`showspectrumpic`) and read them to confirm structure: notes, silences, and drums entering where planned. Fix balance with the `GAIN` table, not by guessing.
+**The model cannot hear the result, so measure it.** Run `STEMS=1 node song.js && node engine/tools/levels.js out/music.wav out/stem-*.wav` for RMS/peak per stem per section. Then compare against the targets in the cookbook: for a big-payoff film, a quiet intro around -19 dB RMS, the drop around -11, and any silence truly `-inf`; tender films stay gentler throughout. Check the integrated loudness (-14 to -11 LUFS) with ffmpeg `ebur128`. Render spectrograms (`showspectrumpic`) and read them to confirm structure: notes, silences, and drums entering where planned. Fix balance with the `GAIN` table, not by guessing.
 
 ### 5. Write `film.js`
 
@@ -97,7 +107,7 @@ Report the output path, duration, resolution and size. Explain the sync gimmicks
 - **Determinism.** Use `U.hash(...)` / seeded `mulberry32` only, never `Math.random()`. Parallel workers must draw identical frames.
 - **Hand-drawn feel.** `Studio` calls `G.setTime(t)`, so lines re-jitter 12 times per second. Keep the paper-grain post pass on. Rotate captions slightly and tape them on.
 - **Impact frames.** Put sunbursts *behind* characters by drawing them earlier in `draw()` (the example's film/room.js passes a `beforeChars` callback for this). Never draw thick black rays over faces.
-- **Silence before the payoff.** A half-beat of true silence (gate the master after the reverbs) plus a drained freeze frame makes the drop land twice as hard.
+- **Silence is a tool.** In a big-payoff film, a half-beat of true silence (gate the master after the reverbs) plus a drained freeze frame makes the drop land twice as hard. Other shapes rarely need it.
 - **Draw order.** Draw captions before full-screen wipes. After clipping to hatch, rebuild the path before stroking (the toolkit already does this).
 - **Safety on the user's machine.** The renderer's file server and every Chrome debug port are OS-assigned (no fixed ports), it serves only files inside the project folder, and it only ever kills the Chrome process groups it launched itself. Never kill anything else; other Claude sessions may be rendering at the same time. Never touch the user's dev servers or ports. Ask before git commits, pushes, publishing, or installing anything.
 
@@ -118,5 +128,6 @@ Report the output path, duration, resolution and size. Explain the sync gimmicks
 
 ### Scripts
 - **`scripts/new-project.js`**: scaffold a project (engine + template) with a preflight check
+- **`scripts/smoke-test.js`**: end-to-end engine check (render, mux, a crashing ffmpeg, two renders in one folder); run it after changing the engine
 - **`engine/render.js`**: `stills | sheet | video | mux | check`
 - **`engine/tools/levels.js`**: per-section RMS/peak meter for the mix and stems

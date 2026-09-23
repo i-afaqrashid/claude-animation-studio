@@ -45,6 +45,8 @@ Both must equal the score's timestamp (the World Cup film: 32.500s for both).
 | A render "finishes" with missing frames | an ffmpeg child failed silently | exit codes are checked and `video.mp4` frame count is verified against the score (done) |
 | A file next to the project could be served (`../film-evil/x`) | prefix check `startsWith(ROOT)` | path is resolved + realpath'd and must be inside `ROOT/` (done) |
 | Another render is already running | several Claude sessions can render at once | ports are OS-assigned so they never collide; never kill processes you didn't launch |
+| Render hangs forever | ffmpeg died while the renderer waited for its pipe to drain | the wait races against ffmpeg's exit and fails fast (done; covered by `scripts/smoke-test.js`) |
+| Two renders in one project trample `out/` | shared temp folders | per-run temp dirs + `out/.render.lock`; the second render is refused (done) |
 
 ## Etiquette on the user's machine
 - Never kill processes the renderer did not start (another session may be rendering), and never touch the user's dev servers or ports (e.g. 3000).

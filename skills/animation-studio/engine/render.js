@@ -28,6 +28,8 @@ function findChrome() {
   throw new Error('Chrome/Chromium not found. Set CHROME_PATH=/path/to/chrome');
 }
 const CHROME = findChrome();
+const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg';
+const FFPROBE = process.env.FFPROBE_PATH || 'ffprobe';
 
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.ttf': 'font/ttf', '.otf': 'font/otf', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.json': 'application/json' };
 let PAGE = null;
@@ -172,20 +174,40 @@ async function grab(w, t) {
   return Buffer.from(url.slice(url.indexOf(',') + 1), 'base64');
 }
 
+// One video/mux render at a time per project folder (others get a clear message, not a collision).
+const LOCK = path.join(OUT, '.render.lock');
+function acquireLock() {
+  try {
+    fs.writeFileSync(LOCK, String(process.pid), { flag: 'wx' });
+  } catch (e) {
+    if (e.code !== 'EEXIST') throw e;
+    const pid = parseInt(fs.readFileSync(LOCK, 'utf8'), 10);
+    let alive = false;
+    try { process.kill(pid, 0); alive = true; } catch (err) { alive = err.code === 'EPERM'; }
+    if (alive && pid !== process.pid) throw new Error(`another render (pid ${pid}) is already running in this project folder: wait for it to finish, or render from a separate copy of the project`);
+    fs.rmSync(LOCK, { force: true }); // stale lock from a crashed run
+    return acquireLock();
+  }
+  process.on('exit', () => {
+    try { if (parseInt(fs.readFileSync(LOCK, 'utf8'), 10) === process.pid) fs.rmSync(LOCK, { force: true }); } catch (e) { /* gone */ }
+  });
+}
+
 function countFrames(file) {
-  const out = execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-count_packets', '-show_entries', 'stream=nb_read_packets', '-of', 'csv=p=0', file]).toString().trim();
+  const out = execFileSync(FFPROBE, ['-v', 'error', '-select_streams', 'v:0', '-count_packets', '-show_entries', 'stream=nb_read_packets', '-of', 'csv=p=0', file]).toString().trim();
   return parseInt(out, 10);
 }
 const finalName = (arg) => path.join(OUT, `${arg || path.basename(ROOT)}.mp4`);
 
 async function main() {
   const [mode, ...args] = process.argv.slice(2);
+  if (mode === 'mux' || mode === 'video') acquireLock();
   if (mode === 'mux' || mode === 'check') {
     const file = finalName(args[0]);
     if (mode === 'mux') {
-      execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', path.join(OUT, 'video.mp4'), '-i', path.join(OUT, 'music.wav'), '-map', '0:v', '-map', '1:a',
+      execFileSync(FFMPEG, ['-v', 'error', '-y', '-i', path.join(OUT, 'video.mp4'), '-i', path.join(OUT, 'music.wav'), '-map', '0:v', '-map', '1:a',
         '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-c:a', 'aac', '-b:a', '256k', '-shortest', file], { stdio: 'inherit' });
-      const info = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration:stream=codec_type', '-of', 'json', file]).toString());
+      const info = JSON.parse(execFileSync(FFPROBE, ['-v', 'error', '-show_entries', 'format=duration:stream=codec_type', '-of', 'json', file]).toString());
       const types = info.streams.map((x) => x.codec_type);
       const dur = parseFloat(info.format.duration);
       if (!types.includes('video') || !types.includes('audio')) throw new Error(`${file} is missing a stream (has: ${types.join(', ')})`);
@@ -193,8 +215,8 @@ async function main() {
       console.log(`wrote ${file} (video + audio, ${dur.toFixed(2)}s verified)`);
     } else {
       const rows = Math.max(1, Math.ceil(DURATION / 2 / 6));
-      execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', file, '-vf', `fps=0.5,scale=480:-1,tile=6x${rows}:padding=4:color=white`, '-frames:v', '1', path.join(OUT, 'check-sheet.png')]);
-      const r = require('child_process').spawnSync('ffmpeg', ['-hide_banner', '-nostats', '-i', file, '-af', 'ebur128=peak=true', '-f', 'null', '-'], { encoding: 'utf8' });
+      execFileSync(FFMPEG, ['-v', 'error', '-y', '-i', file, '-vf', `fps=0.5,scale=480:-1,tile=6x${rows}:padding=4:color=white`, '-frames:v', '1', path.join(OUT, 'check-sheet.png')]);
+      const r = require('child_process').spawnSync(FFMPEG, ['-hide_banner', '-nostats', '-i', file, '-af', 'ebur128=peak=true', '-f', 'null', '-'], { encoding: 'utf8' });
       const sum = r.stderr.slice(r.stderr.lastIndexOf('Summary:'));
       console.log('contact sheet (every 2s): out/check-sheet.png');
       console.log(sum.split('\n').filter((l) => /I:|LRA:|Peak:/.test(l)).map((l) => l.trim()).join('\n'));
@@ -215,23 +237,23 @@ async function main() {
   } else if (mode === 'sheet') {
     const [a = 0, b = DURATION, n = 16, cols = 4] = args.map(parseFloat);
     const w = await openWorker('w0');
-    const dir = path.join(OUT, 'sheet');
-    fs.rmSync(dir, { recursive: true, force: true });
+    const dir = path.join(OUT, `.sheet-${process.pid}`);
     fs.mkdirSync(dir, { recursive: true });
+    process.on('exit', () => fs.rmSync(dir, { recursive: true, force: true }));
     for (let i = 0; i < n; i++) {
       const t = n === 1 ? a : a + ((b - a) * i) / (n - 1);
       fs.writeFileSync(path.join(dir, `f${String(i).padStart(3, '0')}.png`), await grab(w, t));
     }
     w.close();
-    execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', path.join(dir, 'f%03d.png'), '-vf', `scale=640:-1,tile=${cols}x${Math.ceil(n / cols)}:padding=6:color=white`, '-frames:v', '1', path.join(OUT, 'sheet.png')]);
+    execFileSync(FFMPEG, ['-v', 'error', '-y', '-i', path.join(dir, 'f%03d.png'), '-vf', `scale=640:-1,tile=${cols}x${Math.ceil(n / cols)}:padding=6:color=white`, '-frames:v', '1', path.join(OUT, 'sheet.png')]);
     console.log('sheet written: out/sheet.png');
   } else if (mode === 'video') {
     const workers = parseInt(args[0] || String(Math.max(2, os.cpus().length - 1)), 10);
     const total = Math.round(DURATION * FPS);
     const per = Math.ceil(total / workers);
-    const segDir = path.join(OUT, 'segments');
-    fs.rmSync(segDir, { recursive: true, force: true });
+    const segDir = path.join(OUT, `.segments-${process.pid}`); // private to this run
     fs.mkdirSync(segDir, { recursive: true });
+    process.on('exit', () => fs.rmSync(segDir, { recursive: true, force: true }));
     const t0 = Date.now();
     let done = 0;
     await Promise.all(Array.from({ length: workers }, async (_, k) => {
@@ -239,28 +261,36 @@ async function main() {
       if (f0 >= f1) return;
       const w = await openWorker('w' + k);
       const seg = path.join(segDir, `seg${String(k).padStart(2, '0')}.mp4`);
-      const ff = spawn('ffmpeg', ['-v', 'error', '-y', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'png', '-i', '-',
+      const ff = spawn(FFMPEG, ['-v', 'error', '-y', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'png', '-i', '-',
         '-c:v', 'libx264', '-preset', 'medium', '-crf', '14', '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-g', '60', seg], { stdio: ['pipe', 'inherit', 'inherit'] });
-      const ffDone = new Promise((r) => { ff.on('close', (c) => r(c)); ff.on('error', () => r(-1)); });
+      let ffExit = null;
+      const ffDone = new Promise((r) => {
+        ff.on('close', (c) => { ffExit = c ?? -1; r(ffExit); });
+        ff.on('error', () => { ffExit = -1; r(-1); });
+      });
       ff.stdin.on('error', () => { /* ffmpeg died; its exit code is reported below */ });
       for (let f = f0; f < f1; f++) {
+        if (ffExit !== null) break; // ffmpeg is gone: stop feeding it
         const png = await grab(w, f / FPS);
-        if (!ff.stdin.write(png)) await new Promise((r) => ff.stdin.once('drain', r));
+        // wait for room in the pipe OR for ffmpeg to exit, whichever comes first (never hang)
+        if (!ff.stdin.write(png)) await Promise.race([new Promise((r) => ff.stdin.once('drain', r)), ffDone]);
         if (++done % 60 === 0) {
           const el = (Date.now() - t0) / 1000;
           console.log(`${done}/${total} frames  ${(done / el).toFixed(1)} fps  eta ${((total - done) / (done / el)).toFixed(0)}s`);
         }
       }
-      ff.stdin.end();
+      if (ffExit === null) ff.stdin.end();
       const code = await ffDone;
       w.close();
       if (code !== 0) throw new Error(`ffmpeg failed while encoding segment ${k} (exit code ${code})`);
     }));
     const list = fs.readdirSync(segDir).filter((f) => f.endsWith('.mp4')).sort().map((f) => `file '${path.join(segDir, f)}'`).join('\n');
     fs.writeFileSync(path.join(segDir, 'list.txt'), list);
-    execFileSync('ffmpeg', ['-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', path.join(segDir, 'list.txt'), '-c', 'copy', path.join(OUT, 'video.mp4')]);
-    const frames = countFrames(path.join(OUT, 'video.mp4'));
-    if (frames !== total) throw new Error(`out/video.mp4 has ${frames} frames, expected ${total}: a segment is missing or truncated`);
+    const tmp = path.join(segDir, 'video.mp4');
+    execFileSync(FFMPEG, ['-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', path.join(segDir, 'list.txt'), '-c', 'copy', tmp]);
+    const frames = countFrames(tmp);
+    if (frames !== total) throw new Error(`the encoded video has ${frames} frames, expected ${total}: a segment is missing or truncated`);
+    fs.renameSync(tmp, path.join(OUT, 'video.mp4')); // only a verified file ever becomes out/video.mp4
     console.log(`out/video.mp4 done in ${((Date.now() - t0) / 1000).toFixed(1)}s (${frames} frames verified)`);
   } else {
     console.log('usage: node engine/render.js stills|sheet|video|mux|check ...');
