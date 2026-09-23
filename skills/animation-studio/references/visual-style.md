@@ -10,6 +10,20 @@ ink `#2A2320` · paper `#F4EDE0` · cream `#F6F0E2` · claude `#D97757` · kit o
 - Hatch colour = the fill darkened, alpha 0.2–0.35, gap 6–9px.
 - Post (`G.post`) multiplies a paper-grain texture (0.35 on TV screens, 0.55 elsewhere), a vignette (0.32) and overlay film grain (0.06).
 
+## Style packs (one switch for the whole look)
+`STYLE: 'chalk'` in score.js's exports (or `node engine/render.js stills 3 --style neon` to try one). Films keep their colours; the style changes the technique:
+| style | look | good for |
+|---|---|---|
+| `paper` (default) | boiling pencil lines, hatching, paper grain | stories, promos, warmth |
+| `flat` | no outlines, no wobble, clean fills | explainers, data, corporate |
+| `pixel` | the frame rendered in 6 px blocks, lines stepped at 8 fps | games, retro, chiptune music |
+| `chalk` | dusty broken strokes, scribble fills, a chalkboard (`G.bg`) | teaching, "how it works", school |
+| `neon` | glowing tubes, translucent fills, bloom, a night (`G.bg`) | nightlife, launches, EDM, tech |
+| `watercolor` | layered washes with pooled edges, heavy paper | weddings, food, travel, gentle stories |
+- Paint the background with `G.bg(ctx, '#F4EDE0')`: chalk and neon swap in their board/night, the others use your colour.
+- Dark styles set `G.C.ink` light, so default outlines and text stay readable. Explicit dark colours in a film stay dark: check with `stills` in the style.
+- Match the music: pixel ↔ chiptune, neon ↔ edm, watercolor ↔ lofi/orchestral, chalk ↔ lofi.
+
 ## Lighting (the cheap, great trick)
 Draw the scene fully lit, then multiply a full-screen radial gradient whose centre is where the light comes from:
 - TV glow at night: core white → `#C3C8EE` → edges `#4E5080` (+ a subtle blue screen-mode spill).
@@ -51,6 +65,11 @@ Real apps in a hand-drawn world: the phone and its screens are crisp (system fon
 - **Hard cut** on a bar line for shocks (interception → tension).
 - **Dissolve** (0.8s) out of a frozen climax into the calm outro.
 - **Circle wipe** `UI.iris(ctx, t, tc, {cx, cy, color})`: a brand-colour disc grows from the key object until the frame is covered at `tc`, then a hole opens to the next shot. For a logo hit, draw only the closing half and cut hard to the end card at `tc` (the cut is the visible hit).
+
+## Data, maps and screenshots
+- `Data.counter` for big numbers (Rs amounts with `lakh: true` for Pakistani audiences), `Data.bars` / `Data.line` / `Data.donut` for charts. Put each reveal time in score.js so the music hits with it.
+- Maps: `Data.drawMap` + `Data.pin` (one pin per beat, labels on the side with room) + `Data.route` (a plane from Lahore to London). Borders follow Natural Earth's de facto lines.
+- Real screenshots: `render.js snap https://site --full` → `UI.imageScreen(img, { scroll })` inside `UI.phone`; `G.kenBurns` for a desktop screenshot or a photo.
 
 ## Text
 - Captions: `G.caption(ctx, {t, end, text, x, y, rot, size}, t)` with Caveat Bold, a torn cream note and 2 tape strips. They pop in with outBack.

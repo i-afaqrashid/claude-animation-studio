@@ -15,7 +15,8 @@
   // offset = seconds of lead-in before bar 0 (e.g. a black frame + a click).
   // tempo (optional) = [[bar, bpm], …]: the tempo ramps linearly between points (an accelerando, like a
   // qawwali speeding up), constant after the last. BEAT/BAR are then the starting values; use beatAt(t).
-  function makeClock({ bpm = 120, offset = 0.5, beatsPerBar = 4, tempo = null } = {}) {
+  function makeClock({ bpm = 120, offset = 0.5, beatsPerBar = 4, tempo = null, beats = null, downbeat = 0 } = {}) {
+    if (beats && beats.length > 1) return beatClock(beats, downbeat, beatsPerBar);
     const BEAT = 60 / bpm;
     const BAR = BEAT * beatsPerBar;
     if (!tempo || !tempo.length) {
@@ -50,6 +51,36 @@
       for (let b = bar0; b < bar1; b++) for (let s = 0; s < stepsPerBar; s++) fn(T(b, (s * beatsPerBar) / stepsPerBar), b, s);
     };
     return { bpm, BEAT, BAR, OFFSET: offset, beatsPerBar, T, beatPos, phase, eachStep, beatAt: (t) => 60 / bpmAt(t), bpmAt, tempo: pts };
+  }
+
+  // a clock on measured beats (render.js analyze): bar 0 starts on beat index `downbeat`; between two
+  // beats time is linear, outside the song the median beat continues
+  function beatClock(beats, downbeat, beatsPerBar) {
+    // the typical beat: a least-squares line through the beats (steadier than any one interval)
+    const n = beats.length, mi = (n - 1) / 2, mt = beats.reduce((a, b) => a + b, 0) / n;
+    let sxy = 0, sxx = 0; beats.forEach((b, i) => { sxy += (i - mi) * (b - mt); sxx += (i - mi) ** 2; });
+    const BEAT = sxy / sxx, BAR = BEAT * beatsPerBar;
+    const timeOfBeat = (p) => {
+      const q = p + downbeat;
+      if (q <= 0) return beats[0] + q * BEAT;
+      if (q >= n - 1) return beats[n - 1] + (q - n + 1) * BEAT;
+      const i = Math.floor(q);
+      return beats[i] + (beats[i + 1] - beats[i]) * (q - i);
+    };
+    const T = (bar, beat = 0) => timeOfBeat(bar * beatsPerBar + beat);
+    const beatPos = (t) => {
+      if (t <= beats[0]) return (t - beats[0]) / BEAT - downbeat;
+      if (t >= beats[n - 1]) return n - 1 + (t - beats[n - 1]) / BEAT - downbeat;
+      let lo = 0, hi = n - 1;
+      while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (beats[mid] <= t) lo = mid; else hi = mid; }
+      return lo + (t - beats[lo]) / (beats[lo + 1] - beats[lo]) - downbeat;
+    };
+    const beatAt = (t) => { const p = Math.floor(beatPos(t) + downbeat); return p >= 0 && p < n - 1 ? beats[p + 1] - beats[p] : BEAT; };
+    const phase = (t) => ((beatPos(t) % 1) + 1) % 1;
+    const eachStep = (bar0, bar1, stepsPerBar, fn) => {
+      for (let b = bar0; b < bar1; b++) for (let s = 0; s < stepsPerBar; s++) fn(T(b, (s * beatsPerBar) / stepsPerBar), b, s);
+    };
+    return { bpm: Math.round(600 / BEAT) / 10, BEAT, BAR, OFFSET: T(0), beatsPerBar, T, beatPos, phase, eachStep, beatAt, bpmAt: (t) => 60 / beatAt(t), tempo: 'beats', beats };
   }
 
   // A melody bar written in 8th notes: [[note, start8th, dur8ths], ...] -> [{t, dur, midi}]

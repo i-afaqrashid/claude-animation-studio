@@ -21,6 +21,11 @@ Most people watch muted and platforms read caption text for search, so give ever
   - Options: `size`, `y`, `color`, `highlight`, `fam`. Placement defaults to the bottom of `G.SAFE`, and long lines wrap.
 - `render.js srt` writes `out/<name>.srt` + `.vtt`, taken from out/voice.json, else `subtitles`, else `captions`. `render.js mux --subs` adds a soft subtitle track.
 
+## Voiceover, singing and your own song
+- **Voiceover:** `Voice.speak([...])` in song.js. It writes `out/voice.json` with the lines, word times and a mouth track, and the music ducks under the voice. `Subs.fromVoice(VO)` gives word-exact captions, and `Subs.mouth(VO, t, who)` gives lip-sync. See music-cookbook.md.
+- **Sung jingles:** `Sing.line('si-tey dot pee-kay', notes)` sings a brand name, and `Sing.happyBirthday(name)` a birthday song.
+- **Your own song:** `render.js analyze song.mp3 [--lrc song.lrc]` writes `beats.js` (tempo, beats, bars, sections, lyrics). Build the clock on it with `makeClock({ beats })`, then use `MIX.loadAudio` for the soundtrack.
+
 ## Hook and pacing (`render.js pacing`)
 Measured on the rendered file:
 - first movement ≤ 1s,
@@ -96,6 +101,14 @@ Studio.film({ draw: Shots.film([
 - Transitions: `cut`, `fade`, `dip`, `iris`, `irisIn` (close + hard cut: the cleanest hit for `verify`), `wipe` and `push` (dir left/right/up/down), `whip`, `zoom`, `flash`, `paper` (a torn sheet, optional `text`).
 - Each shot's `draw(ctx, t, s)` gets `s.u` (0..1 through the shot), `s.dt` and `s.cam`.
 - Parallax: `Shots.layers(ctx, s.cam, [{ depth: 0.3, draw: far }, { depth: 1, draw: near }])`.
+
+## Real screenshots (`render.js snap <url> [--desktop] [--full] [--hide ".cookie"] [--dark]`)
+- It captures a phone (390×844 at 2x) or a desktop (1440×900) screenshot of a live site into `assets/`. `--full` takes the whole page (after scrolling it, so lazy images load).
+- Show it with `UI.phone(ctx, x, y, h, UI.imageScreen(img, { scroll: (t) => U.keys(t, [[T(2), 0], [T(4), 0.5]]) }), t)`, or pan across it with `G.kenBurns`.
+- Only use sites the user owns or may show.
+
+## Style packs (`--style chalk` on any command, or score.js `STYLE`)
+Choose from `paper`, `flat`, `pixel`, `chalk`, `neon` and `watercolor`. See visual-style.md. Output names carry the style, e.g. `out/video-neon.mp4`.
 
 ## Text in any script
 - `G.text`, `G.measure`, `UI.text` and `UI.measure` split a string into runs by script.

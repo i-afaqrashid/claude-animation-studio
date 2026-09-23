@@ -168,6 +168,53 @@ const probe = (file) => JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-sho
   if (fmOk) { const pr = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=width,height', '-of', 'json', fmF]).toString()); fmOk = pr.streams[0].width === 540 && pr.streams[0].height === 960; }
   pass('formats 9:16 --draft → a vertical 540x960 film from the same score', fmOk, fm.code ? fm.out.slice(-300) : '');
 
+  // 8. v0.7: song analysis, voiceover (the silent engine works everywhere; `say` when on a Mac)
+  run(['song.js']);
+  const an = run(['engine/render.js', 'analyze', 'out/music.wav']);
+  let anOk = an.code === 0 && fs.existsSync(path.join(proj, 'beats.js')) && fs.existsSync(path.join(proj, 'out', 'analysis.svg'));
+  let anDetail = an.code ? an.out.slice(-300) : '';
+  if (anOk) {
+    const A = JSON.parse(fs.readFileSync(path.join(proj, 'out', 'analysis.json'), 'utf8'));
+    const off = A.beats.map((t) => Math.abs(((t - 0.5 + 0.25) % 0.5) - 0.25) * 1000);
+    anOk = Math.abs(A.bpm - 120) < 1 && off.every((e) => e < 30) && A.bars.every((t) => Math.abs(((t - 0.5 + 1) % 2) - 1) < 0.03);
+    anDetail = `${A.bpm} BPM, ${A.beats.length} beats, worst ${Math.max(...off).toFixed(1)} ms off the grid`;
+  }
+  pass('analyze out/music.wav finds 120 BPM, its beats and its bars', anOk, anDetail);
+  const E = path.join(proj, 'engine');
+  const vo = spawnSync(process.execPath, ['-e', `const V=require(${JSON.stringify(path.join(E, 'audio', 'voice'))});const v=V.speak([{at:0.5,text:'Hello there, film.'},{at:2,text:'Second line!'}],{out:'out',engine:'none'});console.log(JSON.stringify({n:v.lines.length,w:v.lines[0].words.length,m:v.mouth.open.length}))`], { cwd: proj, encoding: 'utf8' });
+  const voj = vo.status === 0 ? JSON.parse(vo.stdout.trim().split('\n').pop()) : {};
+  pass('voiceover (silent engine) writes out/voice.json with word times', vo.status === 0 && voj.n === 2 && voj.w === 3 && voj.m > 0, vo.status ? vo.stderr.slice(-300) : JSON.stringify(voj));
+  const sr2 = run(['engine/render.js', 'srt']);
+  pass('srt prefers the voiceover words', sr2.code === 0 && /from out\/voice\.json/.test(sr2.out), sr2.out.split('\n')[0]);
+  fs.rmSync(path.join(proj, 'out', 'voice.json'));
+  const st1 = run(['engine/render.js', 'stills', '5', '--style', 'pixel']);
+  const px = path.join(proj, 'out', 'stills', 't_005.00.png');
+  const pxBuf = fs.existsSync(px) ? fs.readFileSync(px) : null;
+  run(['engine/render.js', 'stills', '5']);
+  pass('--style pixel renders a different look of the same frame', st1.code === 0 && !/EXCEPTION/.test(st1.out) && pxBuf && !pxBuf.equals(fs.readFileSync(px)), st1.code ? st1.out.slice(-300) : '');
+  // a frame using the v0.7 drawing APIs: map + pins + counter + charts + acting characters + animals
+  const kit = path.join(tmp, 'kit-film');
+  spawnSync(process.execPath, [path.join(SKILL, 'scripts', 'new-project.js'), kit, '--format', '9:16'], { encoding: 'utf8' });
+  fs.writeFileSync(path.join(kit, 'film.js'), `(function () {
+  const G = globalThis.G, Ch = globalThis.Ch, Data = globalThis.Data, Studio = globalThis.Studio;
+  Studio.film({ draw(ctx, t) {
+    G.bg(ctx, '#F4EDE0');
+    const map = Data.map({ region: 'Pakistan', x: 40, y: 200, w: 1000, h: 900 });
+    Data.drawMap(ctx, map, { highlight: { Pakistan: '#3FA89B' } });
+    ['Karachi', 'Lahore', 'Islamabad'].forEach((c, i) => Data.pin(ctx, ...map.city(c), { t, at: 0.2 * i, label: c }));
+    Data.route(ctx, map.city('Karachi'), map.city('Lahore'), { t, t0: 0, t1: 1, icon: 'plane' });
+    Data.counter(ctx, { x: 540, y: 1200, from: 0, to: 1250000, t, t0: 0, t1: 1, prefix: 'Rs ', lakh: true });
+    Data.bars(ctx, { x: 100, y: 1250, w: 400, h: 200, data: [{ label: 'A', value: 3 }, { label: 'B', value: 5 }], t, t0: 0 });
+    Data.donut(ctx, { x: 800, y: 1350, r: 110, data: [{ value: 2 }, { value: 1 }], t, t0: 0 });
+    Ch.person(ctx, { x: 300, y: 1700, s: 0.5, ...Ch.walk(t, { x0: 300 }), gesture: 'wave', mouth: { open: 0.6, wide: 0.5, talking: true }, style: { outfit: 'sari', hairStyle: 'bun' } });
+    Ch.person(ctx, { x: 600, y: 1700, s: 0.5, pose: 'stand', gesture: 'bat', style: { outfit: 'thobe', headwear: 'ghutra' } });
+    Ch.dog(ctx, { x: 850, y: 1700, s: 0.6, t }); Ch.cat(ctx, { x: 950, y: 1700, s: 0.5, t }); Ch.bird(ctx, { x: 900, y: 1500, t });
+  } });
+})();`);
+  const kr = spawnSync(process.execPath, ['engine/render.js', 'stills', '1.5'], { cwd: kit, encoding: 'utf8' });
+  const kOut = kr.stdout + kr.stderr;
+  pass('maps, pins, routes, counters, charts, gestures, outfits and animals draw without errors', kr.status === 0 && !/EXCEPTION|Error/.test(kOut) && fs.existsSync(path.join(kit, 'out', 'stills', 't_001.50.png')), kOut.slice(-300));
+
   const failed = results.filter((r) => !r.ok).length;
   console.log(`\n${results.length - failed}/${results.length} checks passed${failed ? '' : ' — engine OK'}`);
   if (!failed) fs.rmSync(tmp, { recursive: true, force: true }); else console.log(`(kept ${tmp} for inspection)`);

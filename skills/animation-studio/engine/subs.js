@@ -21,6 +21,36 @@
   };
   // subtitles from the film's own caption list (a fallback when no subtitles were written)
   Subs.fromCaptions = (captions) => (captions || []).filter((c) => c.text).map((c) => ({ t: c.t, end: c.end, text: c.text }));
+  // subtitles from the voiceover (out/voice.json, loaded with Studio.loadJSON): exact word times, long
+  // lines split into chunks of at most `maxWords` (breaking after punctuation when it can), each held
+  // `hold` seconds after its last word (but never over the next chunk)
+  Subs.fromVoice = (vo, { maxWords = 7, hold = 0.5 } = {}) => {
+    const out = [];
+    for (const l of (vo && vo.lines) || []) {
+      const ws = l.words && l.words.length ? l.words : Subs.words(l);
+      let i = 0;
+      while (i < ws.length) {
+        let n = Math.min(maxWords, ws.length - i);
+        if (ws.length - i > maxWords) { for (let k = n; k >= Math.ceil(maxWords / 2); k--) if (/[,.;:!?،۔]$/.test(ws[i + k - 1].w)) { n = k; break; } }
+        const chunk = ws.slice(i, i + n);
+        out.push({ t: chunk[0].t, end: chunk[chunk.length - 1].end + hold, text: chunk.map((w) => w.w).join(' '), words: chunk, ...(l.who ? { who: l.who } : {}), ...(l.alt && i === 0 ? { alt: l.alt } : {}) });
+        i += n;
+      }
+    }
+    for (let k = 0; k + 1 < out.length; k++) out[k].end = Math.min(out[k].end, out[k + 1].t);
+    return out;
+  };
+  // lip-sync from the voiceover: { open 0..1, wide 0..1, talking } at time t. With `who`, only lines
+  // spoken by that character move its mouth. Feed it to a character: Ch.draw(ctx, { …, mouth: Subs.mouth(VO, t, 'mum') })
+  Subs.mouth = (vo, t, who) => {
+    const none = { open: 0, wide: 0.5, talking: false };
+    if (!vo || !vo.mouth) return none;
+    const line = (vo.lines || []).find((l) => t >= l.t - 0.05 && t <= l.end + 0.05);
+    if (!line || (who && line.who && line.who !== who) || (who && !line.who && who !== true)) return none;
+    const M = vo.mouth, f = t * M.fps, i = Math.floor(f), u = f - i;
+    const at = (arr, j) => arr[Math.max(0, Math.min(arr.length - 1, j))] ?? 0;
+    return { open: at(M.open, i) * (1 - u) + at(M.open, i + 1) * u, wide: at(M.wide, i) * (1 - u) + at(M.wide, i + 1) * u, talking: true };
+  };
 
   const stamp = (s, sep) => {
     const ms = Math.max(0, Math.round(s * 1000));

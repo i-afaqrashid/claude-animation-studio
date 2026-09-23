@@ -118,6 +118,12 @@ function pickFormat(def) {
   if (typeof location !== 'undefined' && location.search) { const f = new URLSearchParams(location.search).get('format'); if (f) return f; }
   return def;
 }
+// the look: score.js STYLE, unless a render asked for another (--style chalk / ?style=chalk)
+function pickStyle(def) {
+  if (typeof process !== 'undefined' && process.env && process.env.ANIM_STYLE) return process.env.ANIM_STYLE;
+  if (typeof location !== 'undefined' && location.search) { const f = new URLSearchParams(location.search).get('style'); if (f) return f; }
+  return def;
+}
 // Where text, faces and logos stay visible. On tall (9:16) videos the platforms cover the top
 // (header), the bottom (caption, handle, audio) and the right edge (like/share buttons);
 // other formats keep a 5% margin.
@@ -127,6 +133,6 @@ function safeArea(w, h) {
   return { x: m, y: m, w: w - 2 * m, h: h - 2 * m };
 }
 
-const U = { mulberry32, hash, noise1, clamp, lerp, invLerp, remap, smooth, ease, tween, springKick, pulse, keys, FORMATS, formatSize, safeArea, pickFormat };
+const U = { mulberry32, hash, noise1, clamp, lerp, invLerp, remap, smooth, ease, tween, springKick, pulse, keys, FORMATS, formatSize, safeArea, pickFormat, pickStyle };
 if (typeof module !== 'undefined') module.exports = U; else globalThis.U = U;
 })();

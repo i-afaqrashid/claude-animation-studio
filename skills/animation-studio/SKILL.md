@@ -1,7 +1,7 @@
 ---
 name: animation-studio
-description: This skill should be used when the user asks to "make an animated video about X with music", "make a cartoon / animated short", "animate this story", "make a video like the Opus animations", "make an explainer animation", "make a promo video for my app / brand", or "make an animated Reel / TikTok / Short" — a new hand-drawn 2D film where every frame is drawn in code and the soundtrack is synthesized in code, synced from one score, delivered as a 1080p MP4 in 16:9, 9:16, 1:1 or 4:5. Not for CSS/web/UI animation, Lottie/SVG/GIF assets, editing or adding music to an existing video, or Remotion/Manim projects.
-version: 0.6.0
+description: This skill should be used when the user asks to "make an animated video about X with music", "make a cartoon / animated short", "animate this story", "make a video like the Opus animations", "make an explainer animation (with a voiceover)", "make a promo video for my app / brand / website", "make an animated Reel / TikTok / Short", "make a lyric video / animate to my song", "make an animated map or infographic", or "make a jingle / birthday video" — a new hand-drawn 2D film where every frame is drawn in code and the soundtrack is synthesized in code (or is the user's own song, beat-analysed), synced from one score, delivered as a 1080p MP4 in 16:9, 9:16, 1:1 or 4:5. Not for CSS/web/UI animation, Lottie/SVG/GIF assets, editing existing video footage, or Remotion/Manim projects.
+version: 0.7.0
 ---
 
 # Animation Studio
@@ -80,6 +80,13 @@ Render parts into buses (`drums, bass, pad, keys, brass, choir, crowd, fx`), add
 
 For acoustic colour there are `I.guitar(midi, dur, {bright, sustain})` (a plucked string, in tune to a fraction of a cent) and `I.epiano(midi, dur)` (a warm FM electric piano); call-and-response between them suits chats and conversations.
 
+Shortcuts (all in `references/music-cookbook.md`):
+- **Genre packs:** `Genre.play('lofi' | 'chiptune' | 'orchestral' | 'edm' | 'afrobeats' | 'qawwali' | 'desi' | 'boombap', …)` lays down drums, bass and chords in one call. You write the hook.
+- **Voiceover:** `Voice.speak([{ at, text, voice, who }])` uses offline TTS (macOS `say`, piper, kokoro or espeak-ng). It writes `out/voice.json` with word times and a mouth track. Add `MIX.duck` under it.
+- **Sung words:** `Sing.line('si-tey dot pee-kay', notes)` for jingles, and `Sing.happyBirthday(name)`.
+- **The user's own song:** `node engine/render.js analyze song.mp3 [--lrc lyrics.lrc]` writes `beats.js` (tempo, beats, bars, sections, lyrics). Build the clock with `makeClock({ beats })`, and use `MIX.loadAudio` for the soundtrack.
+- **Tempo changes:** `makeClock({ tempo: [[bar, bpm], …] })`.
+
 **The model cannot hear the result, so measure it.** Run `STEMS=1 node song.js && node engine/tools/levels.js out/music.wav out/stem-*.wav` for RMS/peak per stem per section. Then compare against the targets in the cookbook: for a big-payoff film, a quiet intro around -19 dB RMS, the drop around -11, and any silence truly `-inf`; tender films stay gentler throughout. Check the integrated loudness (-14 to -11 LUFS): `levels.js` prints it. To hit an exact loudness, run `LUFS=-14 node song.js`, which makes `MIX.master` solve for it (use -14 for YouTube/Spotify-normalised platforms, -12 to -11 for X and feeds). `MIX.master` also limits the true peak to -1.5 dBTP, so the file will not clip when platforms re-encode it. Render spectrograms (`showspectrumpic`) and read them to confirm structure: notes, silences, and drums entering where planned. Fix balance with the `GAIN` table, not by guessing.
 
 ### 5. Write `film.js`
@@ -87,6 +94,13 @@ For acoustic colour there are `I.guitar(midi, dur, {bright, sustain})` (a plucke
 Call `Studio.film({ draw(ctx, t) {...}, post, init })`. Every visual is a **pure function of t**, so any frame can render in any order on any worker. Build characters with `Ch.claude(ctx, {...})` (the orange block mascot: eyes, arms, squash/stretch, scarf, mouth) and `Ch.person(ctx, {..., style: {...}})` (see `references/custom-characters.md`). Pose people by hand targets, since arms use 2-bone IK. Draw everything with `G.*` so lines boil at 12fps and fills get pencil hatching; the key calls are `G.rrect/ellipse/poly/line/limb`, `G.caption`, `G.bubble`, `G.confetti`, `G.firework`, `G.star` and `G.rays`. Drive motion from the clock: `hop()` lands on beats, squash on the downbeat, cuts on bar lines. If the film grows beyond film.js, add each new file as a `<script>` after `engine/video/boot.js` in index.html. See `references/visual-style.md` and `references/engine-api.md`.
 
 Lay everything out from `G.W` / `G.H` (the score's format), never from hard-coded 1920×1080 numbers, and keep text, faces and logos inside `G.SAFE`. On 9:16 the platforms cover the top ~11%, the bottom ~22% and the right edge with their own UI. For products and brands, draw the app with the UI kit (`UI.phone`, `UI.card`, `UI.pill`, `UI.button`, `UI.chat`, `UI.stat`, `UI.check`, `UI.ring`, `UI.iris`) after `UI.setTheme({ accent, … })` with the brand's colours. Real-app UI goes in the clean system font inside the phone; the world around it stays hand-drawn. Use only facts and numbers the client confirms, and put a real logo in with `Studio.loadImage` + `UI.logo`.
+
+More tools for film.js:
+- **Style packs:** `STYLE: 'flat' | 'pixel' | 'chalk' | 'neon' | 'watercolor'` in score.js (`paper` is the default), or `--style` on any command. Paint the background with `G.bg`.
+- **Acting:** `Ch.walk`, 15 `gesture`s (wave, point, phone, cheer, dua, mic, bat…), lip-sync with `mouth: Subs.mouth(VO, t, who)`, outfits (thobe, abaya, sari, suit), headwear (topi, cap, turban, ghutra), and `Ch.dog` / `Ch.cat` / `Ch.bird`.
+- **Data:** `Data.counter` (with `lakh: true` for Rs amounts), `Data.bars` / `line` / `donut`, and maps with `Data.map` + `Data.drawMap` + `Data.pin` + `Data.route`.
+- **Real sites:** `render.js snap https://site --full`, then `UI.imageScreen(img, { scroll })` inside `UI.phone`, or `G.kenBurns` for a pan.
+- **Captions:** `Subs.draw(ctx, t, Subs.fromVoice(VO))` for a voiceover, or `SCORE.subtitles` otherwise.
 
 ### 6. Review like a director (loop until it's good)
 

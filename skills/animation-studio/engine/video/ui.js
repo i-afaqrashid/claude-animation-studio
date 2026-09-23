@@ -132,7 +132,7 @@
   // 412 wide (a real phone's width in points) × h tall, so app layouts use real-app numbers.
   // The status bar (time, island, battery) is drawn on top.
   UI.PHONE_W = 412;
-  UI.phone = (ctx, cx, cy, h, screen, t, { rot = 0, time = '9:41', bezel = '#1B1A1F', shadow = true, sketch = true, dark = false } = {}) => {
+  UI.phone = (ctx, cx, cy, h, screen, t, { rot = 0, time = '9:41', bezel = '#1B1A1F', shadow = true, sketch = true, dark = !!(screen && screen.dark) } = {}) => {
     const w = h * 0.47, r = h * 0.075, b = h * 0.016;
     ctx.save();
     ctx.translate(cx, cy);
@@ -154,6 +154,39 @@
     ctx.restore();
     if (sketch) G.rrect(ctx, -w / 2, -h / 2, w, h, r, { lw: Math.max(2, h * 0.004), seed: 5, amp: 1.2, stroke: bezel, second: false });
     ctx.restore();
+  };
+  // a real screenshot (render.js snap) as the phone's screen, scrolled. scroll: a fraction of the page
+  // (0 top … 1 bottom) or a function of t, e.g. (t) => U.keys(t, [[T(2), 0], [T(4), 0.6]]).
+  // statusBar: leave the top 52 px for the clock row (a mobile screenshot already has its own top bar)
+  UI.imageScreen = (img, { scroll = 0, statusBar = true, bg = '#FFFFFF' } = {}) => {
+    const top = topColor(img);
+    const fn = (ctx, w, h, t) => {
+      if (!img || !img.width) return;
+      const k = w / img.width, ih = img.height * k, bar = statusBar ? 52 : 0;
+      const f = typeof scroll === 'function' ? scroll(t) : scroll;
+      const y = -clamp(f, 0, 1) * Math.max(0, ih - (h - bar));
+      ctx.fillStyle = bg; ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, bar + y, w, ih);
+      if (statusBar) { ctx.fillStyle = top.css; ctx.fillRect(0, 0, w, bar); }
+    };
+    fn.dark = top.dark; // UI.phone draws a light clock over a dark site
+    return fn;
+  };
+  // the colour of an image's top edge (the status bar continues the site's header)
+  const TOPS = new WeakMap();
+  const topColor = (img) => {
+    if (!img || !img.width) return { css: th.app, dark: false };
+    let c = TOPS.get(img);
+    if (c) return c;
+    const cv = document.createElement('canvas'); cv.width = 16; cv.height = 1;
+    const x = cv.getContext('2d', { willReadFrequently: true });
+    x.drawImage(img, 0, 0, img.width, Math.min(8, img.height), 0, 0, 16, 1);
+    const d = x.getImageData(0, 0, 16, 1).data;
+    let r = 0, g = 0, b = 0; for (let i = 0; i < 64; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+    r = Math.round(r / 16); g = Math.round(g / 16); b = Math.round(b / 16);
+    c = { css: `rgb(${r},${g},${b})`, dark: 0.3 * r + 0.59 * g + 0.11 * b < 128 };
+    TOPS.set(img, c);
+    return c;
   };
   // bottom tab bar: items = ['Home', 'Search', …], active = the highlighted one
   UI.navBar = (ctx, w, h, items, active) => {

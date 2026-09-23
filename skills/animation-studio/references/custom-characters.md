@@ -36,6 +36,15 @@ Audition before animating: set `globalThis.CAST = { hero: {...}, friend: {...} }
 
 When personalizing for a real viewer, ask for (or read from a photo they share) hair style and colour, facial hair, glasses, skin tone, typical clothing and one signature pose. Map each to the table above, and keep the cartoon kind and flattering. Never store or publish the photo itself; only the style description goes into code.
 
+## 2b. Acting: walking, gestures, lip-sync, outfits, animals (v0.7)
+- **Walk:** `Ch.person(ctx, { ...Ch.walk(t, { x0: -200, speed: 260, t0: T(2) }), y: GROUND, style })`. `Ch.walk` returns `x`, the leg phase `walk` and `pose: 'walk'`: legs lift in turn, arms swing, the body bobs. Match `speed` to `stride` so the feet do not slide (stride ≈ 300 px at s = 1).
+- **Gestures:** `gesture: 'wave'` (animated), `point`, `pointUp`, `thumbsUp`, `phone` (holds a phone), `typing`, `cheer` (arms up, bouncing), `shrug`, `facepalm`, `think` (hand at chin), `clap` (animated), `akimbo`, `dua` (hands raised in prayer), `mic` (holding a microphone: presenters and commentators), `bat` (a cricket batting stance). Explicit `handL` / `handR` still win.
+- **Lip-sync:** `mouth: Subs.mouth(VO, t, 'dad')`, where VO is `out/voice.json` from the voiceover. The mouth opens with the voice's loudness and widens on bright vowels. Works on `Ch.claude` too.
+- **Outfits:** `outfit: 'thobe'` (white robe to the ankles; add `headwear: 'ghutra'`), `'abaya'` (long black robe, wide sleeves; pair with `hairStyle: 'hijab'`), `'sari'` (wrap skirt + pallu over the shoulder; `robe` = sari colour, `shirt` = blouse, `trim` = border, gold by default), `'suit'` (jacket with lapels + tie; `robe` = jacket, `trim` = tie). Set a robe's colour with `style.robe`.
+- **Headwear:** `headwear: 'topi'` (prayer cap), `'cap'` (baseball cap, `headwearColor`), `'turban'`, `'ghutra'` (headscarf with a black agal).
+- **Animals:** `Ch.dog` (sit/stand, a tail that wags faster when `happy`, `bark`), `Ch.cat` (swaying tail, `meow`), `Ch.bird` (`flap`, `sing`, `facing`).
+- Dress people as the audience would expect: a grandfather in a kameez and topi, a bride in a red sari, office staff in suits. Show the brief's own culture with care, and avoid caricature.
+
 ## 3. Building a new character from primitives
 
 For pets, robots, vehicles, mascots, products, and creatures, write `Ch.<name>(ctx, o)` in a film file. The complete worked example is `examples/characters/cat.js` (`Ch.cat`: tabby/tuxedo/plain patterns, expressions, a waving tail, a collar and bell, a party hat). Copy it next to `film.js` and load it in `index.html` after `engine/video/boot.js`.

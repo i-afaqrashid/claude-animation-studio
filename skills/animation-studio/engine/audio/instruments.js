@@ -311,6 +311,132 @@ function ting(midi = 88, { gap = 0.075, seed = 1 } = {}) {
   return out;
 }
 
+// ================= GENRE KITS =================
+// --- chiptune (NES-style): band-limited pulse waves, a 4-bit stepped triangle, LFSR noise drums.
+// Volumes step in 16 levels like the real chip. duty 0.125 (thin) · 0.25 (classic lead) · 0.5 (hollow)
+const q16 = (v) => Math.round(v * 15) / 15;
+function pulse(midi, dur, { duty = 0.25, decay = 0, vib = 0, slide = 0 } = {}) {
+  const out = buf(dur + 0.005), sq = new Square(0, duty), f0 = mtof(midi);
+  for (let i = 0; i < out.length; i++) {
+    const t = i / SR;
+    const f = f0 * Math.pow(2, (slide * Math.min(1, t / 0.06) + (vib && t > 0.12 ? vib * Math.sin(TAU * 6 * t) : 0)) / 12);
+    const env = q16((decay ? Math.exp(-t / decay) : 1) * (t < dur ? 1 : 0));
+    out[i] = sq.next(f) * 0.32 * env * Math.min(1, t / 0.001) * Math.min(1, Math.max(0, (dur + 0.004 - t) / 0.004));
+  }
+  return out;
+}
+function triangle(midi, dur) { // the NES bass: 32-step triangle, no volume control (just on/off)
+  const out = buf(dur + 0.005), f = mtof(midi);
+  let ph = 0;
+  for (let i = 0; i < out.length; i++) {
+    ph = (ph + f / SR) % 1;
+    const tri = ph < 0.5 ? ph * 4 - 1 : 3 - ph * 4;
+    out[i] = (Math.round(tri * 7.5) / 7.5) * 0.45 * (i / SR < dur ? 1 : 0);
+  }
+  return out;
+}
+function chipNoise(kind = 'snare', seed = 1) { // 15-bit LFSR noise at a chip clock rate
+  const len = { kick: 0.16, snare: 0.18, hat: 0.05, crash: 0.6 }[kind] || 0.15;
+  const out = buf(len);
+  let reg = 1 + (seed & 0x3fff), hold = 0, v = 1;
+  const period = { kick: 60, snare: 8, hat: 2, crash: 3 }[kind] || 8, short = kind === 'hat';
+  for (let i = 0; i < out.length; i++) {
+    const t = i / SR;
+    if (--hold <= 0) { const bit = (reg ^ (reg >> (short ? 6 : 1))) & 1; reg = (reg >> 1) | (bit << 14); v = reg & 1 ? 1 : -1; hold = period; }
+    let s = v * q16(Math.exp(-t / (len * 0.35)));
+    if (kind === 'kick') s = s * 0.3 + Math.sin(TAU * (60 + 180 * Math.exp(-t / 0.02)) * t) * q16(Math.exp(-t / 0.06));
+    out[i] = s * 0.5;
+  }
+  return out;
+}
+// --- EDM: a supersaw (7 detuned saws, spread in stereo) and an 808 (a gliding, saturated sine)
+function supersaw(midi, dur, { detune = 22, cutoff = 5200, attack = 0.01, release = 0.15, seed = 1 } = {}) {
+  const f = mtof(midi), len = dur + release + 0.02, L = buf(len), R = buf(len);
+  const r = rng(seed * 11 + midi), n = 7, oscs = [];
+  for (let k = 0; k < n; k++) oscs.push({ o: new Saw(Math.abs(r())), c: Math.pow(2, (((k - 3) / 3) * detune) / 1200), pan: (k - 3) / 3 });
+  const fl = new SVF(), fr = new SVF();
+  for (let i = 0; i < L.length; i++) {
+    const t = i / SR;
+    let l = 0, rr = 0;
+    for (const x of oscs) { const v = x.o.next(f * x.c); l += v * (1 - x.pan) * 0.5; rr += v * (1 + x.pan) * 0.5; }
+    const env = adsr(t, dur, attack, 0.2, 0.8, release);
+    L[i] = fl.lp(l / n, cutoff, 0.7) * env * 0.9; R[i] = fr.lp(rr / n, cutoff, 0.7) * env * 0.9;
+  }
+  return { L, R };
+}
+function bass808(midi, dur, { drive = 1.6, glide = 7, decay = 0.9 } = {}) {
+  const out = buf(dur + 0.3), f = mtof(midi);
+  let ph = 0;
+  for (let i = 0; i < out.length; i++) {
+    const t = i / SR;
+    ph += (f * Math.pow(2, (glide * Math.exp(-t / 0.035)) / 12)) / SR;
+    const env = Math.exp(-t / decay) * Math.min(1, t / 0.002) * (t > dur ? Math.max(0, 1 - (t - dur) / 0.08) : 1);
+    out[i] = Math.tanh(Math.sin(TAU * ph) * drive) * env * 0.8;
+  }
+  return out;
+}
+// --- orchestral: a string section (detuned saws, slow bow, delayed vibrato), pizzicato, timpani
+function strings(midi, dur, { attack = 0.22, release = 0.5, bright = 1, seed = 1 } = {}) {
+  const f = mtof(midi), len = dur + release + 0.05, L = buf(len), R = buf(len);
+  const r = rng(seed * 5 + midi), voices = [];
+  for (let k = 0; k < 6; k++) voices.push({ o: new Saw(Math.abs(r())), c: Math.pow(2, ((r() * 2 - 1) * 9) / 1200), side: k % 2, rate: 5.2 + r() * 0.8, ph: Math.abs(r()) * TAU });
+  const fl = new SVF(), fr = new SVF(), hl = new OnePole(), hr = new OnePole();
+  for (let i = 0; i < L.length; i++) {
+    const t = i / SR;
+    let l = 0, rr = 0;
+    for (const v of voices) {
+      const vib = t > 0.25 ? 0.12 * Math.min(1, (t - 0.25) / 0.4) * Math.sin(TAU * v.rate * t + v.ph) : 0;
+      const x = v.o.next(f * v.c * Math.pow(2, vib / 12));
+      if (v.side) rr += x; else l += x;
+    }
+    const env = adsr(t, dur, attack, 0.3, 0.85, release);
+    const cut = (1200 + 2600 * bright) * (0.6 + 0.4 * Math.min(1, t / attack));
+    L[i] = hl.hp(fl.lp(l / 3, cut, 0.6), 120) * env * 0.55; R[i] = hr.hp(fr.lp(rr / 3, cut, 0.6), 120) * env * 0.55;
+  }
+  return { L, R };
+}
+const pizz = (midi, { seed = 1 } = {}) => guitar(midi, 0.12, { bright: 0.75, sustain: 0.975, seed });
+function timpani(midi, { decay = 1.1, seed = 1 } = {}) {
+  const f = mtof(midi), out = buf(decay * 2.2), w = rng(seed), lp = new OnePole();
+  const modes = [[1, 1, 1], [1.5, 0.5, 0.7], [1.98, 0.35, 0.5], [2.44, 0.2, 0.35]];
+  for (let i = 0; i < out.length; i++) {
+    const t = i / SR, bend = 1 + 0.06 * Math.exp(-t / 0.05);
+    let s = 0;
+    for (const [r, a, d] of modes) s += Math.sin(TAU * f * r * bend * t) * a * Math.exp(-t / (decay * d));
+    out[i] = (s * 0.5 + lp.lp(w(), 900) * Math.exp(-t / 0.01) * 0.5) * Math.min(1, t / 0.002);
+  }
+  return out;
+}
+// --- afrobeats / amapiano: the log drum (a pitched, bending, slightly driven tone) and a rim click
+function logDrum(midi, { decay = 0.32, bend = 5, drive = 1.3 } = {}) {
+  const out = buf(decay * 3), f = mtof(midi);
+  let ph = 0;
+  for (let i = 0; i < out.length; i++) {
+    const t = i / SR;
+    ph += (f * Math.pow(2, (bend * Math.exp(-t / 0.025)) / 12)) / SR;
+    const s = Math.sin(TAU * ph) + 0.3 * Math.sin(TAU * 2 * ph) * Math.exp(-t / 0.08);
+    out[i] = Math.tanh(s * drive) * Math.exp(-t / decay) * Math.min(1, t / 0.0015) * 0.7;
+  }
+  return out;
+}
+function rim(pitch = 1, seed = 1) {
+  const out = buf(0.06), w = rng(seed), bp = new SVF();
+  for (let i = 0; i < out.length; i++) { const t = i / SR; out[i] = (bp.bp(w(), 2400 * pitch, 3) * 1.2 + Math.sin(TAU * 1700 * pitch * t) * 0.6) * Math.exp(-t / 0.012); }
+  return out;
+}
+// --- lo-fi: a vinyl bed (hiss + crackle + the odd pop). Pair with MIX.lofi(bus) for tape wobble.
+function vinyl(len, { crackle = 1, hiss = 1, seed = 3 } = {}) {
+  const out = buf(len), w = rng(seed), r = rng(seed + 7), lp = new OnePole(), hp = new OnePole();
+  let pop = 0;
+  for (let i = 0; i < out.length; i++) {
+    const n = hp.hp(lp.lp(w(), 5000), 300) * 0.02 * hiss;
+    if (Math.abs(r()) < 0.00012 * crackle) pop = (r() > 0 ? 1 : -1) * (0.15 + Math.abs(r()) * 0.35);
+    out[i] = n + pop;
+    pop *= 0.72;
+  }
+  return out;
+}
+
 // ================= MALLETS =================
 function musicBox(midi, { decay = 1.4, seed = 12 } = {}) {
   const f = mtof(midi);
@@ -680,7 +806,7 @@ function scribble(len, seed = 31) {
 
 module.exports = {
   kick, snare, clap, hat, crash, tom, shaker, bell, bass, padNote, pluck, guitar, epiano, musicBox, marimba, brassNote, voice,
-  dholak, tabla, harmonium, ting,
+  dholak, tabla, harmonium, ting, pulse, triangle, chipNoise, supersaw, bass808, strings, pizz, timpani, logDrum, rim, vinyl,
   noiseSweep, boing, thud, paperFwip, tvClick, whistle, bwomp, heartbeat, woodTick, thwack, subBoom, pop,
   fireworkBurst, launchWhistle, scribble, buf,
 };

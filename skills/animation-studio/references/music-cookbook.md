@@ -41,6 +41,79 @@ Checked by measurement: the tabla `na` lands within 2 Hz of its note, the harmon
 - **"Ooooh"**: 14 voices on `u`, glide -4 semitones.
 - Add a pink-noise bed (6 modulated band-passes) under the voices for air. Low-pass it (about 1100 Hz) when the crowd is heard "through a TV".
 
+## Genre packs (engine/audio/genres.js)
+A whole backing track (drums, bass and chords) in one call, in a style. The melody stays yours.
+```js
+const Genre = require('./engine/audio/genres');
+const clock = makeClock({ bpm: Genre.tempo('lofi') });          // a tempo inside the style's range
+const { kicks } = Genre.play('lofi', { clock, from: 0, to: 8, chordAt, buses: { drums, bass, pad, keys }, fill: [7] });
+const lead = Genre.lead('lofi');                                // the style's lead instrument, for your hook
+// … mixdown …
+Genre.fx('lofi', mix, { kicks, buses: [pad, keys] });           // the finishing touch: tape wobble, vinyl, EDM pump
+```
+| style | BPM | sound |
+|---|---|---|
+| `lofi` | 70–90 | swung dusty kit, rim, FM e-piano 7th chords, sub bass, vinyl crackle, tape wow (`MIX.lofi`) |
+| `chiptune` | 130–160 | NES noise drums, pulse-wave arpeggios, triangle bass, `I.pulse` lead |
+| `orchestral` | 80–100 | timpani on the root, sustained `I.strings`, `I.pizz` bass, brass lead |
+| `edm` | 120–128 | four-on-the-floor, `I.supersaw` stabs, offbeat bass, sidechain pump |
+| `afrobeats` | 100–115 | syncopated kick, rim/shaker, `I.logDrum`, guitar skank |
+| `qawwali` | 100–130 | dholak + tabla, taali claps, harmonium chords and lead |
+| `desi` | 95–110 | dholak pop groove, harmonium, ting accents |
+| `boombap` | 85–95 | swung hip-hop kit, 808-ish bass, e-piano stabs |
+
+`Genre.play` options: `gain`, `drums/bassline/chords: false` to drop a part (e.g. no drums in the intro), `fill: [bars]` for a roll into the next bar. Pick a style from the brief: warm/cozy → lofi; retro/gaming → chiptune; epic/cinematic → orchestral; hype/launch → edm; Pakistani/devotional → qawwali; Pakistani/pop → desi. All eight land at -14 LUFS with the master's `lufs` option and pass `scripts/test-audio.js`.
+
+New instruments used by the packs: `I.pulse(midi, dur, {duty, decay, vib, slide})`, `I.triangle(midi, dur)`, `I.chipNoise('kick'|'snare'|'hat', seed)`, `I.supersaw(midi, dur, {detune, cutoff, attack, release})` → `{L,R}`, `I.bass808(midi, dur, {drive, glide, decay})`, `I.strings(midi, dur, {attack, release, bright})` → `{L,R}`, `I.pizz(midi)`, `I.timpani(midi, {decay})`, `I.logDrum(midi, {decay, bend, drive})`, `I.rim(pitch, seed)`, `I.vinyl(seconds, {crackle, hiss})`.
+
+## Singing words (engine/audio/sing.js)
+A formant singer for jingles, a name in "Happy Birthday" or a chant. Spell by sound, split words with `-`:
+```js
+const Sing = require('./engine/audio/sing');
+const notes = MU.placeBar(clock, [['D5', 0, 1], ['B4', 1, 1], ['A4', 2, 2], ['D5', 4, 1], ['F#5', 5, 3]], 8);
+const x = Sing.line('si-tey dot pee-kay', notes, { type: 'alto' });   // one syllable per note
+vox.addMono(x, notes[0].t - x.lead, 0.5);                           // x.lead: its consonants start early
+const hb = Sing.happyBirthday('Ayesha', { bpm: 100, key: 'F' });    // { notes, lyric, audio }
+```
+- Voices: `soprano`, `alto`, `tenor`, `bass`. Options: `vib` (semitones), `breath`, `glide` (s), `bright`.
+- Vowels: `a/aa` (father), `e` (bed), `i/ee` (see), `o`, `u/oo` (too), `ae` (cat), `uh` (the), diphthongs `ay/ey` (day), `ai/eye` (my), `ow` (now), `oy` (boy). Consonants: stops p b t d k g, hisses s z sh f v th h kh, ch j, hums m n ng, l r w y.
+- `~` holds the previous syllable over another note (a melisma). Consonants start *before* the note, so the vowel lands on the beat.
+- It is a synth voice: clear on short hooks (2–6 syllables), not a pop vocal. Double it with a lead instrument playing the same notes, and put the words on screen.
+
+## Voiceover (engine/audio/voice.js)
+Offline text-to-speech, placed on the timeline, with word times and a mouth track.
+```js
+const Voice = require('./engine/audio/voice');
+const vo = Voice.speak([
+  { at: T(1), text: 'Meet Pantrio.' },
+  { at: T(3), text: 'Order karo, WhatsApp pe.', voice: 'Rishi', who: 'dad' },
+], { out: path.join(__dirname, 'out'), length: DURATION });
+MIX.duck([musicBus], vo.bus, { depth: 0.6 });   // the music dips about 8 dB only while someone talks
+const mix = MIX.mixdown({ music: musicBus, voice: vo.bus }, { voice: 1 });
+```
+- Engines (auto-detected in this order; force one with `engine` or env `ANIM_TTS`): **kokoro** (python `kokoro`), **piper** (env `PIPER_MODEL`), **say** (macOS: Samantha, Daniel, Karen, Moira, Tessa; `Rishi`/`Aman` for Indian-English, `Lekha` Hindi, `Majed` Arabic), **espeak-ng**, else **none**: a silent placeholder with estimated word times, so the film still builds.
+- Options per line: `voice`, `rate` (words per minute for `say`), `gain`, `pan`, `alt` (a second-language subtitle line), `who` (which character speaks, for lip-sync).
+- It writes `out/voice.json`: lines with exact word times, and a 30 fps mouth track (`open`, `wide`). Every line is cached in `out/.vo-cache`, so re-running song.js costs nothing.
+- In film.js: `const VO = Studio.loadJSON('out/voice.json')` at boot, then `Subs.draw(ctx, t, Subs.fromVoice(VO), { style: 'pop' })` and `mouth: Subs.mouth(VO, t, 'dad')` on the speaking character. `render.js srt` exports the same words.
+- Leave room: about 2.5 words per second, with ≥ 0.4 s between lines. Put hits between sentences, not on top of words.
+
+## Cutting to your own song (`render.js analyze`)
+```bash
+node engine/render.js analyze assets/song.mp3 [--lrc assets/song.lrc] [--bpm 128] [--meter 3]
+```
+- It writes `out/analysis.json`, `beats.js` and `out/analysis.svg` (look at it). Contents: tempo, every beat, the bars, sections (intro/verse/chorus/break/outro with A/B letters), energy per bar, strong hits, and the LRC lyrics (with word times from enhanced `<mm:ss.xx>` tags).
+- In index.html, add `<script src="beats.js"></script>` before score.js. In score.js:
+  `const A = typeof module !== 'undefined' ? require('./beats.js') : globalThis.ANALYSIS;`
+  `const clock = MUSIC.makeClock({ beats: A.beats, downbeat: A.downbeat, beatsPerBar: A.meter });`
+  From then on `T(bar, beat)` sits on the song's real beats, even when a live band drifts.
+- In song.js, the soundtrack is the song itself: `const mix = MIX.loadAudio('assets/song.mp3', { length: DURATION });`, optionally with your own hits on top, then `master` and `writeWav('out/music.wav')`.
+- Lyric videos: `Subs.draw(ctx, t, A.lyrics, { style: 'karaoke' })`, and big type on `A.hits`.
+- Accuracy: on the engine's own songs (known tempo), every beat was within 25 ms of the grid and the bar phase was always right. Pass `--bpm` if a song has a half- or double-time feel and the tempo comes out wrong.
+- Use only music the user owns or has the rights to.
+
+## Tempo changes (accelerando, ritardando)
+`makeClock({ bpm: 100, tempo: [[0, 100], [8, 100], [16, 140]] })`: `[bar, bpm]` points, with linear ramps between them, integrated exactly. `T`, `beatPos`, `placeBar`, `eachStep` and `Genre.play` all follow it. A qawwali that speeds up to its climax is the classic use.
+
 ## Arrangement per section
 
 - **Intro**: music box + soft pad (+ TV murmur). No drums.

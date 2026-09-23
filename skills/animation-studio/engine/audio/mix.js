@@ -1,7 +1,7 @@
 // Mixing + mastering helpers: sidechain pump, gates, master bus, WAV writer.
 const fs = require('fs');
 const path = require('path');
-const { SR, Bus, OnePole } = require('./dsp');
+const { SR, Bus, OnePole, SVF } = require('./dsp');
 
 // Duck buses on every kick (the "pump" of dance music). kickTimes in seconds.
 function sidechain(buses, kickTimes, { depth = 0.55, release = 0.11, n } = {}) {
@@ -148,6 +148,49 @@ function masterOnce(b, drive, ceiling, truePeak) {
   }
 }
 
+// Lo-fi tape: slow wow + fast flutter (a modulated delay line), a gentle low-pass and soft saturation.
+// Apply to the whole mix (before master) or to a single bus.
+function lofi(bus, { wow = 1, flutter = 1, lowpass = 5200, sat = 1.2 } = {}) {
+  const n = bus.n, L = Float32Array.from(bus.L), R = Float32Array.from(bus.R);
+  const fl = new SVF(), fr = new SVF();
+  for (let i = 0; i < n; i++) {
+    const t = i / SR;
+    const d = (0.006 + 0.0028 * wow * Math.sin(2 * Math.PI * 0.55 * t) + 0.00022 * flutter * Math.sin(2 * Math.PI * 7.3 * t)) * SR;
+    const p = i - d, i0 = Math.floor(p), fr0 = p - i0;
+    const a = i0 >= 0 && i0 + 1 < n ? 1 : 0;
+    const l = a ? L[i0] * (1 - fr0) + L[i0 + 1] * fr0 : 0, r = a ? R[i0] * (1 - fr0) + R[i0 + 1] * fr0 : 0;
+    bus.L[i] = Math.tanh(fl.lp(l, lowpass, 0.6) * sat) / sat;
+    bus.R[i] = Math.tanh(fr.lp(r, lowpass, 0.6) * sat) / sat;
+  }
+  return bus;
+}
+
+// Duck the music under a voice (or any bus): follows the voice's envelope, so the music dips only while
+// someone is talking. depth 0.6 = about -8 dB.
+function duck(buses, key, { depth = 0.6, attack = 0.015, release = 0.25, threshold = 0.02 } = {}) {
+  const n = key.n, g = new Float32Array(n);
+  let env = 0;
+  const a = Math.exp(-1 / (attack * SR)), r = Math.exp(-1 / (release * SR));
+  for (let i = 0; i < n; i++) {
+    const x = Math.max(Math.abs(key.L[i]), Math.abs(key.R[i]));
+    env = x > env ? a * env + (1 - a) * x : r * env + (1 - r) * x;
+    g[i] = 1 - depth * Math.min(1, env / threshold);
+  }
+  for (const b of buses) for (let i = 0; i < Math.min(n, b.n); i++) { b.L[i] *= g[i]; b.R[i] *= g[i]; }
+}
+
+// Load any audio file (mp3, wav, m4a…) as a stereo Bus at 48 kHz: your own song, a recorded voice.
+// { at: seconds to start it at, gain, length: total seconds of the bus (default: the file + at) }
+function loadAudio(file, { at = 0, gain = 1, length } = {}) {
+  const r = require('child_process').spawnSync(process.env.FFMPEG || 'ffmpeg', ['-v', 'error', '-i', file, '-f', 'f32le', '-ac', '2', '-ar', String(SR), '-'], { maxBuffer: 2 ** 31 });
+  if (r.status !== 0) throw new Error(`could not decode ${file}: ${String(r.stderr).trim()}`);
+  const x = new Float32Array(r.stdout.buffer.slice(r.stdout.byteOffset, r.stdout.byteOffset + r.stdout.length));
+  const frames = x.length / 2, off = Math.round(at * SR);
+  const b = new Bus(Math.max(Math.ceil((length || 0) * SR), off + frames));
+  for (let i = 0; i < frames && off + i < b.n; i++) { if (off + i < 0) continue; b.L[off + i] = x[2 * i] * gain; b.R[off + i] = x[2 * i + 1] * gain; }
+  return b;
+}
+
 // 32-bit float stereo WAV
 function writeWav(file, b) {
   const n = b.n;
@@ -178,4 +221,4 @@ function mixdown(stems, gains, { stemDir = null } = {}) {
   return out;
 }
 
-module.exports = { sidechain, gate, fadeOut, highpass, master, lufs, writeWav, mixdown };
+module.exports = { sidechain, gate, fadeOut, highpass, master, lufs, lofi, duck, loadAudio, writeWav, mixdown };

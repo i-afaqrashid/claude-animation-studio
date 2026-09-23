@@ -89,8 +89,12 @@
         }
       }
     }
-    // mouth
-    if (mouth === 'open') {
+    // mouth (an object { open, wide, talking } from Subs.mouth lip-syncs it)
+    if (mouth && typeof mouth === 'object') {
+      const op = Math.max(0, Math.min(1, mouth.open || 0)), wd = mouth.wide ?? 0.5;
+      if (!mouth.talking || op < 0.08) G.line(ctx, [[lx - 12, mid + 22], [lx, mid + 27], [lx + 12, mid + 22]], { lw: 4.5, seed: seed + 31 });
+      else G.ellipse(ctx, lx, mid + 26 + op * 6, 10 + wd * 14 + op * 6, 4 + op * 22, { fill: '#3A1D1A', lw: 3.5, seed: seed + 32, amp: 0.8 });
+    } else if (mouth === 'open') {
       const pts = [];
       for (let i = 0; i <= 16; i++) { const a = Math.PI * (i / 16); pts.push([Math.cos(a) * 34 + lx, mid + 22 + Math.sin(a) * 36]); }
       pts.push([-34 + lx, mid + 22]);
@@ -155,20 +159,25 @@
   Ch.HAIR_COLORS = ['#2B211E', '#5A3A22', '#8C5A2B', '#C9A063', '#B8452A', '#9A9A9A', '#E8E4DA'];
   Ch.PERSON_STYLE = {
     skin: C.skin, skinDark: null, hair: C.hair, shirt: C.kit, trim: C.teal, collar: C.cream, shorts: C.navy,
+    robe: null, // thobe / abaya / sari colour (defaults: white thobe, black abaya, magenta sari); suit: jacket colour
+    headwear: 'none', // none | topi (prayer cap) | cap | turban | ghutra (headscarf + agal)
+    headwearColor: null,
     shoes: '#F4F1EA', name: '', number: '',
     hairStyle: 'quiff', // quiff | short | buzz | curlytop | long | curly | bun | ponytail | bald | hijab
     hijab: '#6B4E8A',
     facialHair: 'none', // none | stubble | mustache | trimmed (short beard + mustache) | beard
     glasses: 'none', // none | round | square | sun (round sunglasses)
     glassesColor: null, // frame colour (default ink; gold for sun)
-    outfit: 'jersey', // jersey | tee | hoodie | shirt | dress | kameez
+    outfit: 'jersey', // jersey | tee | hoodie | shirt | dress | kameez | thobe | abaya | sari | suit
     bottoms: 'shorts', // shorts | pants | shalwar | skirt   (a dress brings its own skirt)
     sleeves: null, // short | long | none   (default depends on the outfit)
     build: 'regular', // slim | regular | broad
     print: '', printColor: C.cream, // big text on a tee / hoodie
     freckles: false,
   };
-  const SLEEVES = { jersey: 'short', tee: 'short', dress: 'short', hoodie: 'long', shirt: 'long', kameez: 'long' };
+  const SLEEVES = { jersey: 'short', tee: 'short', dress: 'short', hoodie: 'long', shirt: 'long', kameez: 'long', thobe: 'long', abaya: 'long', sari: 'short', suit: 'long' };
+  const ROBE = { thobe: '#F3F1EA', abaya: '#1F1D24', sari: '#C2185B', suit: '#2C3550' };
+  const ROBES = ['thobe', 'abaya', 'sari'];
   const isDark = (c) => { if (typeof c !== 'string' || c[0] !== '#') return false; const n = parseInt(c.slice(1), 16); return (0.3 * ((n >> 16) & 255) + 0.59 * ((n >> 8) & 255) + 0.11 * (n & 255)) < 70; };
   const BUILD = { slim: 0.86, regular: 1, broad: 1.18 };
 
@@ -180,25 +189,33 @@
       eyes = 'normal', look = 0, lookY = 0, blink = 0, brows = 'neutral', mouth = 'smile',
       handL, handR, knee = [0, 0], pillow = 0, blanket = false, sweat = 0, blush = 0, seed = 300,
       shadow = true, legBend = 0, jersey = true, scarf = false, crossArms = false,
+      gesture = null, walk = 0,
     } = o;
     const outfit = st.outfit, dress = outfit === 'dress', kameez = outfit === 'kameez';
-    const bottoms = dress ? 'skirt' : st.bottoms;
+    const robe = ROBES.includes(outfit), suit = outfit === 'suit';
+    const robeCol = st.robe || ROBE[outfit] || st.shirt;
+    if (robe) { if (outfit !== 'sari') st.shirt = robeCol; st.pants = robeCol; }
+    if (suit) st.pants = st.pants || robeCol;
+    let bottoms = dress ? 'skirt' : robe || suit ? 'pants' : st.bottoms;
     const loose = bottoms === 'shalwar'; // loose trousers
     const dark = isDark(st.shirt);
     const detail = dark ? '#5E5B66' : shade(st.shirt, 0.7); // seams/buttons that read on any fabric
-    const legCol = st.pants || st.shorts; // colour of shorts / pants / skirt
+    const legCol = robe ? robeCol : st.pants || st.shorts; // colour of shorts / pants / skirt
     const skirtCol = dress ? st.shirt : legCol;
     const sleeves = st.sleeves || SLEEVES[outfit] || 'short';
     const bw = BUILD[st.build] || 1;
     const hs = st.hairStyle;
     ctx.save();
     ctx.translate(x, y);
-    if (shadow && pose === 'stand') {
+    if (shadow && pose !== 'sit') {
       ctx.fillStyle = 'rgba(20,10,20,0.22)';
       ctx.beginPath(); ctx.ellipse(0, 4, 110 * s, 14 * s, 0, 0, Math.PI * 2); ctx.fill();
     }
+    // walking (front view): the body bobs twice per cycle and sways; `walk` is the cycle phase (see Ch.walk)
+    const wph = 2 * Math.PI * walk;
+    if (pose === 'walk') ctx.translate(0, -Math.abs(Math.sin(wph)) * 12 * s);
     ctx.scale(s * sx, s * sy);
-    ctx.rotate(rot);
+    ctx.rotate(rot + (pose === 'walk' ? Math.sin(wph) * 0.025 : 0));
     const hip = pose === 'sit' ? 0 : -150;
     const sh = hip - 172; // shoulder line
     const headC = [headX, sh - 82 + headY];
@@ -225,9 +242,11 @@
     } else {
       const pants = bottoms === 'pants' || loose;
       for (const sd of [-1, 1]) {
+        let lift = 0, swing = 0;
+        if (pose === 'walk') { const a = wph + (sd > 0 ? Math.PI : 0); lift = Math.max(0, Math.sin(a)); swing = Math.cos(a); }
         const Hp = [sd * 36, hip + 30];
-        const F = [sd * (46 + legBend * 30), 0 - legBend * 10];
-        const K = [(Hp[0] + F[0]) / 2 + sd * legBend * 40, (Hp[1] + F[1]) / 2];
+        const F = [sd * (46 + legBend * 30) + swing * 8, 0 - legBend * 10 - lift * 34];
+        const K = [(Hp[0] + F[0]) / 2 + sd * legBend * 40 + sd * lift * 12, (Hp[1] + F[1]) / 2 - lift * 14];
         G.limb(ctx, [Hp, K, F], { color: pants ? legCol : st.skin, lw: loose ? 44 : pants ? 34 : 30, seed: seed + 1 + sd });
         G.rrect(ctx, F[0] - 30 + sd * 8, F[1] - 18, 58, 26, 11, { fill: st.shoes, lw: 3.5, seed: seed + 3 + sd, hatch: { color: 'rgba(0,0,0,0.1)', gap: 6 } });
       }
@@ -237,9 +256,11 @@
 
     // ---- arms (IK now, drawn last so hands can hold things) ----
     const SL = [-70 * bw, sh + 16], SR = [70 * bw, sh + 16];
-    const restL = pose === 'sit' ? [-62, -6] : [-92, hip - 30];
-    const restR = pose === 'sit' ? [62, -6] : [92, hip - 30];
-    let pL = handL || restL, pR = handR || restR;
+    const aw = pose === 'walk' ? Math.cos(wph) : 0; // arms swing against the legs
+    const restL = pose === 'sit' ? [-62, -6] : [-92 - 6 * aw, hip - 30 - 16 * Math.max(0, aw)];
+    const restR = pose === 'sit' ? [62, -6] : [92 - 6 * aw, hip - 30 - 16 * Math.max(0, -aw)];
+    const gh = Ch.gestureHands(gesture, { sh, hip, t: G.t });
+    let pL = handL || gh.L || restL, pR = handR || gh.R || restR;
     if (crossArms) { pL = [48 * bw, sh + 94]; pR = [-50 * bw, sh + 80]; }
     if (pillow > 0) {
       const py = U.lerp(-20, headC[1] + 62, pillow);
@@ -257,12 +278,43 @@
       // sitting: the long shirt drapes over the thighs
       if (pose === 'sit') G.rrect(ctx, -96 * bw, -34, 192 * bw, 84, 30, { fill: st.shirt, lw: 4, seed: seed + 140, hatch: torsoHatch });
     }
-    // standing in a kameez, the shirt is ONE long piece from shoulders to knees (no waist seam)
+    if (robe && pose === 'sit') G.rrect(ctx, -100 * bw, -34, 200 * bw, 88, 30, { fill: robeCol, lw: 4, seed: seed + 140, hatch: torsoHatch });
+    // a sari's long wrapped skirt (the pleats show as lines), under the blouse
+    if (outfit === 'sari' && pose !== 'sit') {
+      G.poly(ctx, [[-78 * bw, hip - 20], [78 * bw, hip - 20], [96 * bw, -12], [-96 * bw, -12]], { fill: robeCol, lw: 4, seed: seed + 142, step: 22, hatch: skirtHatch });
+      for (let k = 0; k < 4; k++) G.line(ctx, [[8 + k * 9, hip + 10], [12 + k * 13, -16]], { lw: 2.5, color: shade(robeCol, 0.72), seed: seed + 143 + k });
+      G.line(ctx, [[-96 * bw, -16], [96 * bw, -16]], { lw: 7, color: st.trim === C.teal ? '#E2B33C' : st.trim, seed: seed + 148 });
+    }
+    // standing in a kameez, the shirt is ONE long piece from shoulders to knees (no waist seam);
+    // a thobe or an abaya runs all the way to the ankles
     const longShirt = kameez && pose !== 'sit';
-    const torsoPts = longShirt
-      ? [[-78 * bw, sh], [78 * bw, sh], [80 * bw, hip - 10], [90 * bw, hip + 104], [-90 * bw, hip + 104], [-80 * bw, hip - 10]]
-      : [[-78 * bw, sh], [78 * bw, sh], [74 * bw, hip + 10], [-74 * bw, hip + 10]];
-    const torso = G.poly(ctx, torsoPts, { fill: st.shirt, lw: 4.5, seed: seed + 9, step: 20, hatch: torsoHatch });
+    const fullRobe = (outfit === 'thobe' || outfit === 'abaya') && pose !== 'sit';
+    const torsoPts = fullRobe
+      ? [[-78 * bw, sh], [78 * bw, sh], [82 * bw, hip - 10], [98 * bw, -16], [-98 * bw, -16], [-82 * bw, hip - 10]]
+      : longShirt
+        ? [[-78 * bw, sh], [78 * bw, sh], [80 * bw, hip - 10], [90 * bw, hip + 104], [-90 * bw, hip + 104], [-80 * bw, hip - 10]]
+        : [[-78 * bw, sh], [78 * bw, sh], [74 * bw, hip + (suit ? 30 : 10)], [-74 * bw, hip + (suit ? 30 : 10)]];
+    const torso = G.poly(ctx, torsoPts, { fill: suit ? robeCol : st.shirt, lw: 4.5, seed: seed + 9, step: 20, hatch: torsoHatch });
+    if (fullRobe) {
+      G.line(ctx, [[0, sh + 14], [0, outfit === 'abaya' ? -20 : sh + 110]], { lw: 3, color: outfit === 'abaya' ? (st.trim === C.teal ? '#8C6A9E' : st.trim) : detail, seed: seed + 144 });
+      if (outfit === 'thobe') { G.ellipse(ctx, 0, sh + 2, 26, 12, { fill: shade(robeCol, 0.9), lw: 3, seed: seed + 145 }); for (let k = 0; k < 3; k++) G.ellipse(ctx, 0, sh + 36 + k * 22, 3, 3, { fill: detail, lw: 1, seed: seed + 146 + k, amp: 0.3 }); }
+    }
+    if (suit) {
+      // shirt V, tie, lapels
+      G.poly(ctx, [[-30, sh - 2], [30, sh - 2], [0, sh + 96]], { fill: st.collar === C.cream ? '#F4F2EC' : st.collar, lw: 3, seed: seed + 150, step: 12 });
+      G.poly(ctx, [[-8, sh + 8], [8, sh + 8], [12, sh + 70], [0, sh + 90], [-12, sh + 70]], { fill: st.trim === C.teal ? '#B23A3A' : st.trim, lw: 2.5, seed: seed + 151, step: 10 });
+      for (const sd of [-1, 1]) G.poly(ctx, [[sd * 30, sh - 2], [sd * 58 * bw, sh + 6], [sd * 20, sh + 110], [sd * 4, sh + 100]], { fill: shade(robeCol, 0.8), lw: 3.5, seed: seed + 152 + sd, step: 14 });
+      G.ellipse(ctx, 0, hip - 8, 4, 4, { fill: shade(robeCol, 0.6), lw: 1.5, seed: seed + 155, amp: 0.3 });
+    }
+    if (outfit === 'sari') {
+      // the pallu: over the blouse from the right hip to the left shoulder, with a gold border
+      const border = st.trim === C.teal ? '#E2B33C' : st.trim;
+      const pal = pose === 'sit'
+        ? [[72 * bw, -20], [40 * bw, -30], [-50 * bw, sh + 6], [-84 * bw, sh + 4], [-88 * bw, sh + 40], [-10, -10]]
+        : [[74 * bw, hip + 20], [50 * bw, hip + 30], [-44 * bw, sh + 2], [-84 * bw, sh - 2], [-94 * bw, sh + 60], [-20, hip + 6]];
+      G.poly(ctx, pal, { fill: robeCol, lw: 4, seed: seed + 156, step: 16, hatch: skirtHatch });
+      G.line(ctx, [pal[0], pal[1], pal[2], pal[3]], { lw: 6, color: border, seed: seed + 157 });
+    }
     if (longShirt) for (const sd of [-1, 1]) G.line(ctx, [[sd * 86 * bw, hip + 40], [sd * 89 * bw, hip + 100]], { lw: 3, color: detail, seed: seed + 141 + sd });
     if (outfit === 'jersey') {
       ctx.save();
@@ -300,9 +352,11 @@
         G.limb(ctx, [[S[0] - sd * 4, S[1] - 6], [sx2, sy2]], { color: st.shirt, lw: 36, seed: seed + 15 + sd });
       } else if (sleeves === 'long') {
         const wx = a.E[0] + (a.H[0] - a.E[0]) * 0.78, wy = a.E[1] + (a.H[1] - a.E[1]) * 0.78;
-        G.limb(ctx, [[S[0] - sd * 4, S[1] - 6], a.E, [wx, wy]], { color: dark ? shade(st.shirt, 1.45) : st.shirt, lw: 34, seed: seed + 15 + sd });
+        const sc = suit ? robeCol : st.shirt;
+        G.limb(ctx, [[S[0] - sd * 4, S[1] - 6], a.E, [wx, wy]], { color: isDark(sc) ? shade(sc, 1.45) : sc, lw: outfit === 'abaya' ? 44 : 34, seed: seed + 15 + sd });
       }
       G.ellipse(ctx, a.H[0], a.H[1], 20, 20, { fill: st.skin, lw: 4, seed: seed + 17 + sd });
+      Ch.gestureProp(ctx, gesture, sd, S, a, { seed, skin: st.skin });
     };
     // neck
     G.rrect(ctx, -20, sh - 24, 40, 30, 8, { fill: st.skinDark, lw: 3.5, seed: seed + 19 });
@@ -330,11 +384,15 @@
     } else if (hs === 'ponytail') {
       G.poly(ctx, [[48, -62], [86, -52], [106, -12], [102, 48], [84, 94], [74, 42], [68, -8]], { fill: st.hair, lw: 4, seed: seed + 90, step: 14 });
       G.rrect(ctx, 60, -56, 22, 16, 5, { fill: C.kit, lw: 2.5, seed: seed + 91 });
-    } else if (hs === 'hijab') {
+    }
+    if (st.headwear === 'ghutra') {
+      G.poly(ctx, [[-82, -30], [-60, -84], [0, -100], [60, -84], [82, -30], [92, 60], [104, 130], [0, 150], [-104, 130], [-92, 60]], { fill: st.headwearColor || '#F5F3EE', lw: 4, seed: seed + 92, step: 18, hatch: { color: 'rgba(0,0,0,0.08)', gap: 8 } });
+    }
+    if (hs === 'hijab') {
       G.poly(ctx, [[-80, -10], [-72, -62], [-40, -94], [0, -102], [40, -94], [72, -62], [80, -10], [86, 60], [100, 124], [62, 146], [0, 154], [-62, 146], [-100, 124], [-86, 60]], { fill: st.hijab, lw: 4, seed: seed + 90, step: 18, hatch: { color: 'rgba(0,0,0,0.12)', gap: 8 } });
     }
     // ears
-    if (hs !== 'hijab') {
+    if (hs !== 'hijab' && st.headwear !== 'ghutra') {
       G.ellipse(ctx, -64, 6, 14, 18, { fill: st.skin, lw: 3.5, seed: seed + 21 });
       G.ellipse(ctx, 64, 6, 14, 18, { fill: st.skin, lw: 3.5, seed: seed + 22 });
     }
@@ -368,6 +426,7 @@
       for (let i = 20; i >= 0; i--) { const a = (150 + (i / 20) * 240) * Math.PI / 180; band.push([Math.cos(a) * 58, 8 + Math.sin(a) * 66]); }
       G.shape(ctx, band, { fill: st.hijab, lw: 4, seed: seed + 25, hatch: { color: 'rgba(0,0,0,0.12)', gap: 8 } });
     }
+    Ch.headwear(ctx, st, seed);
     if (st.freckles) {
       ctx.fillStyle = alpha(shade(st.skin, 0.6), 0.8);
       for (const sd of [-1, 1]) for (const [dx, dy] of [[-6, 0], [4, -4], [8, 6], [-2, 9]]) { ctx.beginPath(); ctx.arc(sd * 36 + dx, 16 + dy, 2.2, 0, Math.PI * 2); ctx.fill(); }
@@ -438,8 +497,16 @@
       for (const sd of [-1, 1]) { ctx.beginPath(); ctx.ellipse(sd * 38, 22, 13, 7, 0, 0, Math.PI * 2); ctx.fill(); }
       ctx.restore();
     }
-    // mouth
-    if (mouth === 'flat') G.line(ctx, [[mx - 14, my], [mx + 14, my]], { lw: 4.5, seed: seed + 37 });
+    // mouth (an object { open, wide, talking } from Subs.mouth lip-syncs it)
+    if (mouth && typeof mouth === 'object') {
+      const op = Math.max(0, Math.min(1, mouth.open || 0)), wd = mouth.wide ?? 0.5;
+      if (!mouth.talking || op < 0.08) G.line(ctx, [[mx - 14, my - 2], [mx, my + 3], [mx + 14, my - 2]], { lw: 4.5, seed: seed + 39 });
+      else {
+        const ww = 9 + wd * 12 + op * 4, hh = 3 + op * 15;
+        G.ellipse(ctx, mx, my + 2, ww, hh, { fill: '#3A1D1A', lw: 3.5, seed: seed + 40, amp: 0.6 });
+        if (op > 0.45) { ctx.save(); ctx.fillStyle = '#FFFFFF'; ctx.beginPath(); ctx.ellipse(mx, my + 2 - hh * 0.62, ww * 0.62, hh * 0.22, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+      }
+    } else if (mouth === 'flat') G.line(ctx, [[mx - 14, my], [mx + 14, my]], { lw: 4.5, seed: seed + 37 });
     else if (mouth === 'smirk') G.line(ctx, [[mx - 15, my + 1], [mx + 2, my + 4], [mx + 18, my - 7]], { lw: 4.5, seed: seed + 42 });
     else if (mouth === 'wavy') G.line(ctx, [[mx - 18, my], [mx - 9, my - 5], [mx, my], [mx + 9, my - 5], [mx + 18, my]], { lw: 4, seed: seed + 38, step: 6 });
     else if (mouth === 'smile') G.line(ctx, [[mx - 16, my - 4], [mx, my + 6], [mx + 16, my - 4]], { lw: 4.5, seed: seed + 39 });
@@ -502,6 +569,144 @@
     afaq: { skin: '#C68B61', hair: '#1C1715', hairStyle: 'curlytop', facialHair: 'trimmed', glasses: 'sun', outfit: 'kameez', shirt: '#24232A', bottoms: 'shalwar', shorts: '#24232A', build: 'broad', shoes: '#4A3A32' },
     // the same Afaq as a football fan in the custom #10 jersey (eyes visible for acting)
     afaqFan: { skin: '#C68B61', hair: '#1C1715', hairStyle: 'curlytop', facialHair: 'trimmed', outfit: 'jersey', name: 'AFAQ', number: '10', build: 'broad' },
+  };
+
+  // ---- gestures: where the hands go (sh = shoulder line, hip = hip line, in the person's own units) ----
+  // wave · point · pointUp · thumbsUp · phone · typing · cheer · shrug · facepalm · think · clap · akimbo ·
+  // dua (hands raised, palms up) · mic (holding a microphone) · bat (a cricket batting stance)
+  Ch.GESTURES = ['wave', 'point', 'pointUp', 'thumbsUp', 'phone', 'typing', 'cheer', 'shrug', 'facepalm', 'think', 'clap', 'akimbo', 'dua', 'mic', 'bat'];
+  Ch.gestureHands = (g, { sh, hip, t }) => {
+    switch (g) {
+      case 'wave': return { R: [150 + Math.sin(t * 9) * 28, sh - 120] };
+      case 'point': return { R: [205, sh + 18] };
+      case 'pointUp': return { R: [118, sh - 175] };
+      case 'thumbsUp': return { R: [104, sh + 66] };
+      case 'phone': return { R: [26, sh + 74], L: [-24, sh + 98] };
+      case 'typing': return { L: [-58, hip - 34 + Math.sin(t * 22) * 5], R: [58, hip - 34 + Math.sin(t * 22 + 2.1) * 5] };
+      case 'cheer': { const b = Math.abs(Math.sin(t * 6)) * 16; return { L: [-150, sh - 150 - b], R: [150, sh - 150 - b] }; }
+      case 'shrug': return { L: [-165, sh + 46], R: [165, sh + 46] };
+      case 'facepalm': return { R: [14, sh - 78] };
+      case 'think': return { R: [24, sh - 18] };
+      case 'clap': { const c = Math.abs(Math.sin(t * 9)); return { L: [-(10 + 44 * c), sh + 70], R: [10 + 44 * c, sh + 70] }; }
+      case 'akimbo': return { L: [-60, hip - 34], R: [60, hip - 34] };
+      case 'dua': return { L: [-52, sh + 34], R: [52, sh + 34] };
+      case 'mic': return { R: [34, sh - 30] };
+      case 'bat': return { L: [66, hip - 28], R: [80, hip - 58] };
+      default: return {};
+    }
+  };
+  // what a hand holds or does (drawn right after the hand; sd -1 left, 1 right)
+  Ch.gestureProp = (ctx, g, sd, S, a, { seed = 1, skin } = {}) => {
+    const [hx, hy] = a.H;
+    const dx = hx - a.E[0], dy = hy - a.E[1], d = Math.hypot(dx, dy) || 1;
+    if (sd > 0 && (g === 'point' || g === 'pointUp')) {
+      G.limb(ctx, [[hx, hy], [hx + (dx / d) * 34, hy + (dy / d) * 34]], { color: skin, lw: 10, outline: 3, seed: seed + 190 });
+    } else if (sd > 0 && g === 'thumbsUp') {
+      G.limb(ctx, [[hx - 2, hy - 8], [hx - 4, hy - 34]], { color: skin, lw: 12, outline: 3, seed: seed + 191 });
+    } else if (sd > 0 && g === 'phone') {
+      G.rrect(ctx, hx - 20, hy - 58, 44, 78, 8, { fill: '#26242C', lw: 3.5, seed: seed + 192 });
+      ctx.save(); ctx.fillStyle = 'rgba(160,220,255,0.85)'; ctx.fillRect(hx - 14, hy - 51, 32, 60); ctx.restore();
+      G.ellipse(ctx, hx - 6, hy + 4, 14, 12, { fill: skin, lw: 3, seed: seed + 193 });
+    } else if (sd > 0 && g === 'mic') {
+      G.limb(ctx, [[hx + 2, hy + 12], [hx + 6, hy + 46]], { color: '#2A2A30', lw: 12, outline: 3, seed: seed + 194 });
+      G.ellipse(ctx, hx - 2, hy - 18, 15, 17, { fill: '#55535E', lw: 3.5, seed: seed + 195, hatch: { color: 'rgba(255,255,255,0.25)', gap: 4 } });
+    } else if (sd > 0 && g === 'bat') {
+      // a cricket bat held down and to the side: handle in the hands, blade toward the ground
+      ctx.save(); ctx.translate(hx - 4, hy + 10); ctx.rotate(-0.35);
+      G.rrect(ctx, -6, 0, 12, 60, 5, { fill: '#3A2A22', lw: 3, seed: seed + 196 });
+      G.rrect(ctx, -22, 56, 44, 150, 12, { fill: '#E7C98E', lw: 4, seed: seed + 197, hatch: { color: 'rgba(140,90,30,0.2)', gap: 7 } });
+      ctx.restore();
+    }
+  };
+  // headwear on top of the hair: topi (prayer cap), cap, turban, ghutra (with its black agal ring)
+  Ch.headwear = (ctx, st, seed = 1) => {
+    const hw = st.headwear, col = st.headwearColor;
+    if (!hw || hw === 'none') return;
+    if (hw === 'topi') {
+      G.shape(ctx, [[-60, -40], [-56, -64], [-34, -84], [0, -90], [34, -84], [56, -64], [60, -40], [0, -48]], { fill: col || '#F4F1E8', lw: 4, seed: seed + 200, hatch: { color: 'rgba(120,100,60,0.2)', gap: 5 } });
+      G.line(ctx, [[-56, -52], [0, -60], [56, -52]], { lw: 2.5, color: 'rgba(160,130,70,0.8)', seed: seed + 201 });
+    } else if (hw === 'cap') {
+      G.shape(ctx, [[-64, -30], [-60, -66], [-30, -88], [10, -92], [46, -80], [64, -50], [66, -30]], { fill: col || C.kit, lw: 4, seed: seed + 200 });
+      G.shape(ctx, [[-10, -32], [66, -34], [118, -24], [110, -14], [60, -18], [-6, -20]], { fill: shade(col || C.kit, 0.8), lw: 4, seed: seed + 202 });
+      G.ellipse(ctx, 4, -90, 7, 5, { fill: shade(col || C.kit, 0.7), lw: 2, seed: seed + 203 });
+    } else if (hw === 'turban') {
+      const c = col || '#E8E1CF';
+      G.shape(ctx, [[-72, -20], [-74, -62], [-48, -100], [0, -114], [48, -100], [74, -62], [72, -20], [0, -34]], { fill: c, lw: 4, seed: seed + 200 });
+      for (let k = 0; k < 4; k++) G.line(ctx, [[-66 + k * 8, -30 - k * 20], [0, -46 - k * 18], [66 - k * 8, -64 - k * 12]], { lw: 3, color: shade(c, 0.78), seed: seed + 204 + k });
+    } else if (hw === 'ghutra') {
+      G.shape(ctx, [[-70, -18], [-66, -62], [-36, -90], [0, -96], [36, -90], [66, -62], [70, -18], [52, -40], [0, -54], [-52, -40]], { fill: col || '#F5F3EE', lw: 4, seed: seed + 200 });
+      G.shape(ctx, [[-64, -52], [-36, -76], [0, -82], [36, -76], [64, -52], [58, -44], [0, -66], [-58, -44]], { fill: '#1E1C22', lw: 3, seed: seed + 205 });
+    }
+  };
+  // walking across the frame: where a walker is at t, and the leg phase to pass as `walk`
+  // (stride = the distance of one full cycle, in pixels at s = 1)
+  Ch.walk = (t, { x0 = 0, speed = 220, t0 = 0, stride = 300, s = 1 } = {}) => {
+    const d = Math.max(0, t - t0) * speed;
+    return { x: x0 + d, walk: (d / (stride * s)) % 1, pose: 'walk' };
+  };
+
+  // ---- animals (front-ish, hand-drawn): dog, cat, bird ----
+  // o: { x, y (ground), s, color, t, look, happy (0..1 wags + open mouth), pose: 'sit' | 'stand', flap (bird) }
+  Ch.dog = (ctx, o) => {
+    const { x, y, s = 1, color = '#C98A4B', ear = null, t = G.t, happy = 0.6, look = 0, pose = 'sit', seed = 700, shadow = true, bark = 0 } = o;
+    const ec = ear || shade(color, 0.6);
+    ctx.save(); ctx.translate(x, y);
+    if (shadow) { ctx.fillStyle = 'rgba(20,10,20,0.2)'; ctx.beginPath(); ctx.ellipse(0, 4, 90 * s, 12 * s, 0, 0, Math.PI * 2); ctx.fill(); }
+    ctx.scale(s, s);
+    const wag = Math.sin(t * (6 + happy * 14)) * (0.3 + happy * 0.6);
+    // tail
+    ctx.save(); ctx.translate(64, -60); ctx.rotate(-0.9 + wag);
+    G.limb(ctx, [[0, 0], [22, -28], [30, -60]], { color, lw: 16, seed: seed + 1 });
+    ctx.restore();
+    // body + legs
+    if (pose === 'stand') { for (const lx of [-50, -22, 22, 50]) G.limb(ctx, [[lx, -60], [lx, -4]], { color, lw: 20, seed: seed + 2 + lx }); G.ellipse(ctx, 0, -80, 86, 44, { fill: color, lw: 4.5, seed: seed + 6 }); }
+    else { G.ellipse(ctx, 0, -62, 70, 62, { fill: color, lw: 4.5, seed: seed + 6 }); for (const sd of [-1, 1]) G.ellipse(ctx, sd * 30, -8, 22, 14, { fill: color, lw: 4, seed: seed + 7 + sd }); G.ellipse(ctx, 0, -50, 36, 40, { fill: shade(color, 1.18), lw: 0, seed: seed + 9, amp: 0.6 }); }
+    // head
+    const hx = look * 10, hy = pose === 'stand' ? -150 : -150;
+    ctx.save(); ctx.translate(hx, hy); ctx.rotate(look * 0.12);
+    for (const sd of [-1, 1]) { ctx.save(); ctx.translate(sd * 46, -24); ctx.rotate(sd * (0.5 + Math.sin(t * 3 + sd) * 0.05)); G.ellipse(ctx, 0, 24, 18, 36, { fill: ec, lw: 4, seed: seed + 10 + sd }); ctx.restore(); }
+    G.ellipse(ctx, 0, 0, 56, 50, { fill: color, lw: 4.5, seed: seed + 12 });
+    G.ellipse(ctx, 0, 24, 30, 22, { fill: shade(color, 1.22), lw: 3.5, seed: seed + 13 });
+    G.ellipse(ctx, 0, 12, 11, 8, { fill: '#2A2320', lw: 2, seed: seed + 14 });
+    for (const sd of [-1, 1]) { ctx.fillStyle = '#2A2320'; ctx.beginPath(); ctx.ellipse(sd * 22 + look * 5, -12, 6, 8, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#FFF'; ctx.beginPath(); ctx.arc(sd * 22 + look * 5 - 2, -15, 2, 0, Math.PI * 2); ctx.fill(); }
+    const open = Math.max(bark, happy > 0.5 ? 0.6 : 0);
+    if (open > 0.1) { G.ellipse(ctx, 0, 36, 13, 6 + open * 9, { fill: '#3A1D1A', lw: 3, seed: seed + 15 }); if (happy > 0.5) G.ellipse(ctx, 0, 44 + open * 5, 8, 8, { fill: '#E8718D', lw: 2.5, seed: seed + 16 }); }
+    else G.line(ctx, [[-12, 34], [0, 38], [12, 34]], { lw: 3.5, seed: seed + 17 });
+    ctx.restore();
+    ctx.restore();
+  };
+  Ch.cat = (ctx, o) => {
+    const { x, y, s = 1, color = '#8E8A94', t = G.t, look = 0, happy = 0.4, seed = 740, shadow = true, meow = 0 } = o;
+    ctx.save(); ctx.translate(x, y);
+    if (shadow) { ctx.fillStyle = 'rgba(20,10,20,0.2)'; ctx.beginPath(); ctx.ellipse(0, 4, 70 * s, 10 * s, 0, 0, Math.PI * 2); ctx.fill(); }
+    ctx.scale(s, s);
+    const sway = Math.sin(t * 2.2) * 0.35;
+    G.line(ctx, [[46, -16], [80, -30 + sway * 20], [92, -70 + sway * 30], [78, -104 + sway * 36]], { color, lw: 14, seed: seed + 1, step: 10 });
+    G.ellipse(ctx, 0, -56, 52, 56, { fill: color, lw: 4.5, seed: seed + 2 });
+    for (const sd of [-1, 1]) G.ellipse(ctx, sd * 22, -6, 16, 10, { fill: color, lw: 3.5, seed: seed + 3 + sd });
+    ctx.save(); ctx.translate(look * 8, -128);
+    for (const sd of [-1, 1]) G.poly(ctx, [[sd * 20, -30], [sd * 44, -62], [sd * 48, -20]], { fill: color, lw: 4, seed: seed + 5 + sd, step: 12 });
+    G.ellipse(ctx, 0, 0, 50, 42, { fill: color, lw: 4.5, seed: seed + 7 });
+    for (const sd of [-1, 1]) { G.ellipse(ctx, sd * 18 + look * 4, -4, 8, 10, { fill: '#C8D86A', lw: 2.5, seed: seed + 8 + sd }); ctx.fillStyle = '#2A2320'; ctx.beginPath(); ctx.ellipse(sd * 18 + look * 5, -4, 2.4, 8, 0, 0, Math.PI * 2); ctx.fill(); }
+    G.poly(ctx, [[-5, 8], [5, 8], [0, 14]], { fill: '#E8718D', lw: 2, seed: seed + 10, step: 6 });
+    if (meow > 0.1) G.ellipse(ctx, 0, 22, 7, 4 + meow * 7, { fill: '#3A1D1A', lw: 2.5, seed: seed + 11 });
+    else G.line(ctx, [[-10, 18], [0, 16 + happy * 4], [10, 18]], { lw: 3, seed: seed + 11 });
+    for (const sd of [-1, 1]) for (let k = 0; k < 2; k++) G.line(ctx, [[sd * 16, 12 + k * 6], [sd * 50, 6 + k * 12]], { lw: 1.8, color: 'rgba(40,30,30,0.6)', seed: seed + 12 + k + sd });
+    ctx.restore();
+    ctx.restore();
+  };
+  Ch.bird = (ctx, o) => {
+    const { x, y, s = 1, color = '#3FA89B', t = G.t, flap = 1, facing = 1, seed = 780, sing = 0 } = o;
+    ctx.save(); ctx.translate(x, y); ctx.scale(s * facing, s);
+    const w = Math.sin(t * 22) * flap;
+    G.ellipse(ctx, 0, 0, 30, 24, { fill: color, lw: 3.5, seed: seed + 1 });
+    G.poly(ctx, [[-26, -4], [-50, -14], [-46, 8]], { fill: shade(color, 0.8), lw: 3, seed: seed + 2, step: 10 });
+    ctx.save(); ctx.rotate(-0.3 - w * 0.9); G.shape(ctx, [[-6, -6], [22, -34], [34, -10], [10, 4]], { fill: shade(color, 0.85), lw: 3, seed: seed + 3 }); ctx.restore();
+    G.ellipse(ctx, 24, -14, 16, 15, { fill: color, lw: 3.5, seed: seed + 4 });
+    ctx.fillStyle = '#2A2320'; ctx.beginPath(); ctx.arc(28, -17, 3, 0, Math.PI * 2); ctx.fill();
+    G.poly(ctx, [[36, -16], [52, -12 + sing * 4], [36, -8]], { fill: '#F2B84B', lw: 2.5, seed: seed + 5, step: 8 });
+    if (sing > 0.1) G.poly(ctx, [[36, -10], [50, -4 - sing * 2], [36, -6]], { fill: '#F2B84B', lw: 2, seed: seed + 6, step: 8 });
+    ctx.restore();
   };
 
   // a scarf laid over a sitting person like a blanket
