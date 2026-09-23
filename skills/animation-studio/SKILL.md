@@ -1,7 +1,7 @@
 ---
 name: animation-studio
 description: This skill should be used when the user asks to "make an animated video about X with music", "make a cartoon / animated short", "animate this story", "make a video like the Opus animations", or "make an explainer animation" — a new hand-drawn 2D film where every frame is drawn in code and the soundtrack is synthesized in code, synced from one score, delivered as a 1080p MP4. Not for CSS/web/UI animation, Lottie/SVG/GIF assets, editing or adding music to an existing video, or Remotion/Manim projects.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Animation Studio
@@ -33,7 +33,7 @@ From the request, or with at most one round of questions, settle:
 - who appears, including exact name spellings for jerseys and signatures,
 - whether the Claude mascot belongs (yes for Opus-style or Claude films; otherwise optional).
 
-For subjects with no built-in character (pets, vehicles, products, places), build them in `film.js` from `G.ellipse/rrect/poly/limb` so they boil and hatch like everything else.
+Characters are never fixed. Use a preset (`Ch.STYLES.afaq`, `Ch.STYLES.afaqFan`), customize `Ch.person` (hair, facial hair, glasses, outfit, build, colours), or build new characters (pets, robots, products) from `G.*` primitives. The cat in `examples/characters/cat.js` is the worked example. When the user shares a photo of someone to feature, translate it into `style` options and never store the photo. Real images the user provides can appear as taped prints via `G.photo`. See `references/custom-characters.md`.
 
 ### 1. Write the storyboard as music first
 
@@ -65,7 +65,7 @@ Render parts into buses (`drums, bass, pad, keys, brass, choir, crowd, fx`), add
 
 ### 5. Write `film.js`
 
-Call `Studio.film({ draw(ctx, t) {...}, post, init })`. Every visual is a **pure function of t**, so any frame can render in any order on any worker. Build characters with `Ch.claude(ctx, {...})` (the orange block mascot: eyes, arms, squash/stretch, scarf, mouth) and `Ch.person(ctx, {..., style: { name, number, skin, shirt, ... }})`. Pose people by hand targets, since arms use 2-bone IK. Draw everything with `G.*` so lines boil at 12fps and fills get pencil hatching; the key calls are `G.rrect/ellipse/poly/line/limb`, `G.caption`, `G.bubble`, `G.confetti`, `G.firework`, `G.star` and `G.rays`. Drive motion from the clock: `hop()` lands on beats, squash on the downbeat, cuts on bar lines. If the film grows beyond film.js, add each new file as a `<script>` after `engine/video/boot.js` in index.html. See `references/visual-style.md` and `references/engine-api.md`.
+Call `Studio.film({ draw(ctx, t) {...}, post, init })`. Every visual is a **pure function of t**, so any frame can render in any order on any worker. Build characters with `Ch.claude(ctx, {...})` (the orange block mascot: eyes, arms, squash/stretch, scarf, mouth) and `Ch.person(ctx, {..., style: {...}})` (see `references/custom-characters.md`). Pose people by hand targets, since arms use 2-bone IK. Draw everything with `G.*` so lines boil at 12fps and fills get pencil hatching; the key calls are `G.rrect/ellipse/poly/line/limb`, `G.caption`, `G.bubble`, `G.confetti`, `G.firework`, `G.star` and `G.rays`. Drive motion from the clock: `hop()` lands on beats, squash on the downbeat, cuts on bar lines. If the film grows beyond film.js, add each new file as a `<script>` after `engine/video/boot.js` in index.html. See `references/visual-style.md` and `references/engine-api.md`.
 
 ### 6. Review like a director (loop until it's good)
 
@@ -107,11 +107,13 @@ Report the output path, duration, resolution and size. Explain the sync gimmicks
 - **`references/storytelling.md`**: story arcs mapped to bars, sync-gimmick catalogue, caption voice, endings
 - **`references/music-cookbook.md`**: instrument recipes, arrangement per section, mix/loudness targets, crowd and choir synthesis
 - **`references/visual-style.md`**: palette, boil, hatching, lighting with multiply gradients, camera, transitions, character acting
+- **`references/custom-characters.md`**: presets, every `Ch.person` style option, building new characters, using real images
 - **`references/engine-api.md`**: every function in the engine with parameters
 - **`references/review-and-gotchas.md`**: review commands, sync verification, known pitfalls and fixes
 
 ### Starting points
 - **`template/`** (start here): a 23s starter. Claude drops onto a paper stage and bounces on every beat. Each melody note pops a star, so the melody draws a constellation. Then a held breath, a sunburst drop and a handwritten ending.
+- **`examples/characters/cat.js`**: a complete custom character (`Ch.cat`) built from primitives
 - **`examples/world-cup-2026/`** (patterns only, older API): the 58s film "Claude × Afaq, World Cup 2026". It covers a living room, a TV match where the ball plays the hook, tension with a heartbeat, strike and close-ups, a freeze, GOOOOOAL letters on 8ths, a party, a street chant, a high-five and an outro.
 
 ### Scripts

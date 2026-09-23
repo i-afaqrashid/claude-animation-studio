@@ -48,5 +48,13 @@
     })().catch((e) => console.error('boot failed', String(e), e && e.stack));
   };
 
+  // load a user image from the project folder (e.g. 'assets/logo.png') inside init()
+  Studio.loadImage = (src) => new Promise((resolve, reject) => {
+    const im = new Image();
+    im.onload = () => resolve(im);
+    im.onerror = () => reject(new Error('image failed to load: ' + src));
+    im.src = src;
+  });
+
   globalThis.Studio = Studio;
 })();

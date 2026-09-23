@@ -138,16 +138,59 @@
   // ======================= PERSON =======================
   // A friendly paper-cutout human. pose 'sit': origin = middle of hips on the seat.
   // pose 'stand': origin = between the feet. Arms are posed by hand targets (2-bone IK).
-  // style: { skin, skinDark, hair, shirt, trim, collar, shorts, name, number }
-  Ch.PERSON_STYLE = { skin: C.skin, skinDark: C.skinDark, hair: C.hair, shirt: C.kit, trim: C.teal, collar: C.cream, shorts: C.navy, name: '', number: '' };
+  // Every style option is optional — the defaults draw the original jersey look.
+  const shade = (c, f) => {
+    if (typeof c !== 'string' || c[0] !== '#') return c;
+    const n = parseInt(c.slice(1), 16);
+    const k = (v) => Math.max(0, Math.min(255, Math.round(v * f)));
+    return `rgb(${k((n >> 16) & 255)},${k((n >> 8) & 255)},${k(n & 255)})`;
+  };
+  const alpha = (c, a) => {
+    if (typeof c !== 'string' || c[0] !== '#') return c;
+    const n = parseInt(c.slice(1), 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  };
+  Ch.shade = shade;
+  Ch.SKIN_TONES = ['#F3D2B3', '#E6B48C', '#C98A62', '#A86E4B', '#8D5A3B', '#6B4430'];
+  Ch.HAIR_COLORS = ['#2B211E', '#5A3A22', '#8C5A2B', '#C9A063', '#B8452A', '#9A9A9A', '#E8E4DA'];
+  Ch.PERSON_STYLE = {
+    skin: C.skin, skinDark: null, hair: C.hair, shirt: C.kit, trim: C.teal, collar: C.cream, shorts: C.navy,
+    shoes: '#F4F1EA', name: '', number: '',
+    hairStyle: 'quiff', // quiff | short | buzz | curlytop | long | curly | bun | ponytail | bald | hijab
+    hijab: '#6B4E8A',
+    facialHair: 'none', // none | stubble | mustache | trimmed (short beard + mustache) | beard
+    glasses: 'none', // none | round | square | sun (round sunglasses)
+    glassesColor: null, // frame colour (default ink; gold for sun)
+    outfit: 'jersey', // jersey | tee | hoodie | shirt | dress | kameez
+    bottoms: 'shorts', // shorts | pants | shalwar | skirt   (a dress brings its own skirt)
+    sleeves: null, // short | long | none   (default depends on the outfit)
+    build: 'regular', // slim | regular | broad
+    print: '', printColor: C.cream, // big text on a tee / hoodie
+    freckles: false,
+  };
+  const SLEEVES = { jersey: 'short', tee: 'short', dress: 'short', hoodie: 'long', shirt: 'long', kameez: 'long' };
+  const isDark = (c) => { if (typeof c !== 'string' || c[0] !== '#') return false; const n = parseInt(c.slice(1), 16); return (0.3 * ((n >> 16) & 255) + 0.59 * ((n >> 8) & 255) + 0.11 * (n & 255)) < 70; };
+  const BUILD = { slim: 0.86, regular: 1, broad: 1.18 };
+
   Ch.person = (ctx, o) => {
     const st = Object.assign({}, Ch.PERSON_STYLE, o.style || {});
+    if (!st.skinDark) st.skinDark = st.skin === C.skin ? C.skinDark : shade(st.skin, 0.84);
     const {
       x, y, s = 1, sx = 1, sy = 1, rot = 0, pose = 'sit', headRot = 0, headX = 0, headY = 0,
       eyes = 'normal', look = 0, lookY = 0, blink = 0, brows = 'neutral', mouth = 'smile',
       handL, handR, knee = [0, 0], pillow = 0, blanket = false, sweat = 0, blush = 0, seed = 300,
-      shadow = true, legBend = 0, jersey = true, scarf = false,
+      shadow = true, legBend = 0, jersey = true, scarf = false, crossArms = false,
     } = o;
+    const outfit = st.outfit, dress = outfit === 'dress', kameez = outfit === 'kameez';
+    const bottoms = dress ? 'skirt' : st.bottoms;
+    const loose = bottoms === 'shalwar'; // loose trousers
+    const dark = isDark(st.shirt);
+    const detail = dark ? '#5E5B66' : shade(st.shirt, 0.7); // seams/buttons that read on any fabric
+    const legCol = st.pants || st.shorts; // colour of shorts / pants / skirt
+    const skirtCol = dress ? st.shirt : legCol;
+    const sleeves = st.sleeves || SLEEVES[outfit] || 'short';
+    const bw = BUILD[st.build] || 1;
+    const hs = st.hairStyle;
     ctx.save();
     ctx.translate(x, y);
     if (shadow && pose === 'stand') {
@@ -159,39 +202,45 @@
     const hip = pose === 'sit' ? 0 : -150;
     const sh = hip - 172; // shoulder line
     const headC = [headX, sh - 82 + headY];
+    const skirtHatch = { color: 'rgba(0,0,0,0.12)', gap: 7 };
 
     // ---- legs ----
     if (pose === 'sit') {
+      const pants = bottoms === 'pants' || loose;
       for (const sd of [-1, 1]) {
         const lift = sd < 0 ? knee[0] : knee[1];
         const K = [sd * 50, 58 - lift * 18];
         const F = [sd * 56, 150 - lift * 24];
-        G.limb(ctx, [K, [(K[0] + F[0]) / 2 + sd * 2, (K[1] + F[1]) / 2], F], { color: st.skin, lw: 30, seed: seed + 1 + sd });
-        G.ellipse(ctx, F[0] + sd * 4, F[1] + 4, 32, 16, { fill: '#F4F1EA', lw: 3.5, seed: seed + 3 + sd, hatch: { color: 'rgba(0,0,0,0.1)', gap: 6 } });
+        G.limb(ctx, [K, [(K[0] + F[0]) / 2 + sd * 2, (K[1] + F[1]) / 2], F], { color: pants ? legCol : st.skin, lw: pants ? 34 : 30, seed: seed + 1 + sd });
+        G.ellipse(ctx, F[0] + sd * 4, F[1] + 4, 32, 16, { fill: st.shoes, lw: 3.5, seed: seed + 3 + sd, hatch: { color: 'rgba(0,0,0,0.1)', gap: 6 } });
         G.line(ctx, [[F[0] - 22 + sd * 4, F[1] + 6], [F[0] + 26 + sd * 4, F[1] + 6]], { lw: 2.5, color: st.shirt, seed: seed + 5 + sd });
       }
-      // thighs coming toward camera (shorts) + knee caps
+      // thighs coming toward camera + knee caps
       for (const sd of [-1, 1]) {
         const lift = sd < 0 ? knee[0] : knee[1];
-        G.ellipse(ctx, sd * 50, 44 - lift * 18, 23, 18, { fill: st.skin, lw: 4, seed: seed + 8 + sd });
-        G.rrect(ctx, sd * 50 - 44, -22 - lift * 8, 88, 70, 30, { fill: st.shorts, lw: 4, seed: seed + 7 + sd, hatch: { color: 'rgba(255,255,255,0.08)', gap: 7 } });
+        G.ellipse(ctx, sd * 50, 44 - lift * 18, 23, 18, { fill: pants ? legCol : st.skin, lw: 4, seed: seed + 8 + sd });
+        if (bottoms !== 'skirt') G.rrect(ctx, sd * 50 - 44, -22 - lift * 8, 88, 70, 30, { fill: legCol, lw: 4, seed: seed + 7 + sd, hatch: { color: 'rgba(255,255,255,0.08)', gap: 7 } });
       }
+      if (bottoms === 'skirt') G.rrect(ctx, -104 * bw, -30, 208 * bw, 80, 34, { fill: skirtCol, lw: 4, seed: seed + 71, hatch: skirtHatch });
     } else {
+      const pants = bottoms === 'pants' || loose;
       for (const sd of [-1, 1]) {
         const Hp = [sd * 36, hip + 30];
         const F = [sd * (46 + legBend * 30), 0 - legBend * 10];
         const K = [(Hp[0] + F[0]) / 2 + sd * legBend * 40, (Hp[1] + F[1]) / 2];
-        G.limb(ctx, [Hp, K, F], { color: st.skin, lw: 30, seed: seed + 1 + sd });
-        G.rrect(ctx, F[0] - 30 + sd * 8, F[1] - 18, 58, 26, 11, { fill: '#F4F1EA', lw: 3.5, seed: seed + 3 + sd, hatch: { color: 'rgba(0,0,0,0.1)', gap: 6 } });
+        G.limb(ctx, [Hp, K, F], { color: pants ? legCol : st.skin, lw: loose ? 44 : pants ? 34 : 30, seed: seed + 1 + sd });
+        G.rrect(ctx, F[0] - 30 + sd * 8, F[1] - 18, 58, 26, 11, { fill: st.shoes, lw: 3.5, seed: seed + 3 + sd, hatch: { color: 'rgba(0,0,0,0.1)', gap: 6 } });
       }
-      G.rrect(ctx, -80, hip - 18, 160, 70, 18, { fill: st.shorts, lw: 4, seed: seed + 7, hatch: { color: 'rgba(255,255,255,0.08)', gap: 7 } });
+      if (bottoms === 'skirt') G.poly(ctx, [[-78 * bw, hip - 26], [78 * bw, hip - 26], [104 * bw, hip + 74], [-104 * bw, hip + 74]], { fill: skirtCol, lw: 4, seed: seed + 71, step: 22, hatch: skirtHatch });
+      else G.rrect(ctx, -80 * bw, hip - 18, 160 * bw, pants ? 46 : 70, 18, { fill: legCol, lw: 4, seed: seed + 7, hatch: { color: 'rgba(255,255,255,0.08)', gap: 7 } });
     }
 
-    // ---- arms (behind torso part) ----
-    const SL = [-70, sh + 16], SR = [70, sh + 16];
+    // ---- arms (IK now, drawn last so hands can hold things) ----
+    const SL = [-70 * bw, sh + 16], SR = [70 * bw, sh + 16];
     const restL = pose === 'sit' ? [-62, -6] : [-92, hip - 30];
     const restR = pose === 'sit' ? [62, -6] : [92, hip - 30];
     let pL = handL || restL, pR = handR || restR;
+    if (crossArms) { pL = [48 * bw, sh + 94]; pR = [-50 * bw, sh + 80]; }
     if (pillow > 0) {
       const py = U.lerp(-20, headC[1] + 62, pillow);
       pL = [-82, py + 10];
@@ -201,29 +250,58 @@
     const armL = Ch.ik(SL, pL, 82, 80, pL[1] < sh ? -1 : 1);
     const armR = Ch.ik(SR, pR, 82, 80, pR[1] < sh ? 1 : -1);
 
-    // ---- torso (jersey) ----
-    const torso = G.poly(ctx, [[-78, sh], [78, sh], [74, hip + 10], [-74, hip + 10]], { fill: st.shirt, lw: 4.5, seed: seed + 9, step: 20, hatch: { color: 'rgba(120,40,10,0.22)', gap: 7 } });
-    ctx.save();
-    ctx.beginPath(); G.path(ctx, torso); ctx.clip();
-    // side panels
-    ctx.fillStyle = st.trim;
-    ctx.fillRect(-80, sh, 16, hip - sh + 20);
-    ctx.fillRect(64, sh, 16, hip - sh + 20);
-    ctx.restore();
-    // collar
-    G.poly(ctx, [[-26, sh - 2], [26, sh - 2], [0, sh + 30]], { fill: st.collar, lw: 3.5, seed: seed + 11, step: 12 });
-    if (jersey && st.name) {
-      G.text(ctx, st.name, 0, sh + 70, { size: 30, fam: 'Bungee', weight: 400, color: C.cream, align: 'center', stroke: C.ink, strokeW: 5 });
+    // ---- torso ----
+    if (outfit === 'hoodie') G.rrect(ctx, -72 * bw, sh - 46, 144 * bw, 74, 34, { fill: shade(st.shirt, 0.8), lw: 4, seed: seed + 72 });
+    const torsoHatch = dark ? { color: 'rgba(255,255,255,0.07)', gap: 7 } : { color: 'rgba(120,40,10,0.22)', gap: 7 };
+    if (kameez) {
+      // sitting: the long shirt drapes over the thighs
+      if (pose === 'sit') G.rrect(ctx, -96 * bw, -34, 192 * bw, 84, 30, { fill: st.shirt, lw: 4, seed: seed + 140, hatch: torsoHatch });
     }
-    if (jersey && st.number) {
-      G.text(ctx, String(st.number), 0, sh + (st.name ? 142 : 110), { size: 70, fam: 'Bungee', weight: 400, color: C.cream, align: 'center', stroke: C.ink, strokeW: 7 });
+    // standing in a kameez, the shirt is ONE long piece from shoulders to knees (no waist seam)
+    const longShirt = kameez && pose !== 'sit';
+    const torsoPts = longShirt
+      ? [[-78 * bw, sh], [78 * bw, sh], [80 * bw, hip - 10], [90 * bw, hip + 104], [-90 * bw, hip + 104], [-80 * bw, hip - 10]]
+      : [[-78 * bw, sh], [78 * bw, sh], [74 * bw, hip + 10], [-74 * bw, hip + 10]];
+    const torso = G.poly(ctx, torsoPts, { fill: st.shirt, lw: 4.5, seed: seed + 9, step: 20, hatch: torsoHatch });
+    if (longShirt) for (const sd of [-1, 1]) G.line(ctx, [[sd * 86 * bw, hip + 40], [sd * 89 * bw, hip + 100]], { lw: 3, color: detail, seed: seed + 141 + sd });
+    if (outfit === 'jersey') {
+      ctx.save();
+      ctx.beginPath(); G.path(ctx, torso); ctx.clip();
+      ctx.fillStyle = st.trim; // side panels
+      ctx.fillRect(-80 * bw, sh, 16, hip - sh + 20);
+      ctx.fillRect(80 * bw - 16, sh, 16, hip - sh + 20);
+      ctx.restore();
+      G.poly(ctx, [[-26, sh - 2], [26, sh - 2], [0, sh + 30]], { fill: st.collar, lw: 3.5, seed: seed + 11, step: 12 });
+      if (jersey && st.name) G.text(ctx, st.name, 0, sh + 70, { size: 30, fam: 'Bungee', weight: 400, color: C.cream, align: 'center', stroke: C.ink, strokeW: 5 });
+      if (jersey && st.number) G.text(ctx, String(st.number), 0, sh + (st.name ? 142 : 110), { size: 70, fam: 'Bungee', weight: 400, color: C.cream, align: 'center', stroke: C.ink, strokeW: 7 });
+    } else if (outfit === 'tee' || dress) {
+      G.ellipse(ctx, 0, sh + 2, dress ? 38 : 30, dress ? 24 : 14, { fill: dress ? st.skin : shade(st.shirt, 0.82), lw: 3.5, seed: seed + 73 });
+      if (dress) G.line(ctx, [[-74 * bw, hip - 26], [74 * bw, hip - 26]], { lw: 4, color: shade(st.shirt, 0.7), seed: seed + 74 });
+    } else if (outfit === 'hoodie') {
+      G.rrect(ctx, -52 * bw, hip - 84, 104 * bw, 56, 18, { fill: shade(st.shirt, 0.9), lw: 3.5, seed: seed + 75 });
+      for (const sd of [-1, 1]) {
+        G.line(ctx, [[sd * 14, sh + 4], [sd * 17, sh + 64]], { lw: 3, color: C.cream, seed: seed + 76 + sd });
+        G.ellipse(ctx, sd * 17, sh + 68, 4, 4, { fill: C.cream, lw: 2, seed: seed + 78 + sd, amp: 0.4 });
+      }
+    } else if (outfit === 'shirt' || kameez) {
+      const collar = kameez ? st.shirt : st.collar;
+      for (const sd of [-1, 1]) G.poly(ctx, [[sd * 30, sh - 4], [sd * 4, sh - 2], [sd * 18, sh + 28]], { fill: collar, lw: 3.5, seed: seed + 80 + sd, step: 12, stroke: dark ? detail : C.ink });
+      G.line(ctx, [[0, sh + 12], [0, kameez ? sh + 120 : hip + 6]], { lw: 3, color: detail, seed: seed + 82 });
+      for (let k = 0; k < 4; k++) G.ellipse(ctx, 7, sh + 30 + k * (kameez ? 26 : 34), 3.5, 3.5, { fill: dark ? '#2E2C33' : C.cream, stroke: dark ? detail : C.ink, lw: 1.5, seed: seed + 83 + k, amp: 0.3 });
+      G.rrect(ctx, 26 * bw, sh + 40, 32, 34, 4, { lw: 3, seed: seed + 88, stroke: dark ? detail : C.ink });
     }
+    if (st.print && outfit !== 'jersey') G.text(ctx, st.print, 0, sh + (outfit === 'hoodie' ? 70 : 92), { size: st.print.length > 6 ? 26 : 34, fam: 'Bungee', weight: 400, color: st.printColor, align: 'center', stroke: C.ink, strokeW: 5 });
+
     // arms
     const drawArm = (S, a, sd) => {
       G.limb(ctx, [S, a.E, a.H], { color: st.skin, lw: 27, seed: seed + 13 + sd });
-      // sleeve over upper arm
-      const sx2 = S[0] + (a.E[0] - S[0]) * 0.42, sy2 = S[1] + (a.E[1] - S[1]) * 0.42;
-      G.limb(ctx, [[S[0] - sd * 4, S[1] - 6], [sx2, sy2]], { color: st.shirt, lw: 36, seed: seed + 15 + sd });
+      if (sleeves === 'short') {
+        const sx2 = S[0] + (a.E[0] - S[0]) * 0.42, sy2 = S[1] + (a.E[1] - S[1]) * 0.42;
+        G.limb(ctx, [[S[0] - sd * 4, S[1] - 6], [sx2, sy2]], { color: st.shirt, lw: 36, seed: seed + 15 + sd });
+      } else if (sleeves === 'long') {
+        const wx = a.E[0] + (a.H[0] - a.E[0]) * 0.78, wy = a.E[1] + (a.H[1] - a.E[1]) * 0.78;
+        G.limb(ctx, [[S[0] - sd * 4, S[1] - 6], a.E, [wx, wy]], { color: dark ? shade(st.shirt, 1.45) : st.shirt, lw: 34, seed: seed + 15 + sd });
+      }
       G.ellipse(ctx, a.H[0], a.H[1], 20, 20, { fill: st.skin, lw: 4, seed: seed + 17 + sd });
     };
     // neck
@@ -234,13 +312,85 @@
     ctx.save();
     ctx.translate(headC[0], headC[1]);
     ctx.rotate(headRot);
+    // hair behind the head
+    if (hs === 'long') {
+      G.poly(ctx, [[-70, -48], [-42, -80], [0, -88], [42, -80], [70, -48], [80, 10], [86, 96], [66, 130], [36, 118], [40, 50], [-40, 50], [-36, 118], [-66, 130], [-86, 96], [-80, 10]], { fill: st.hair, lw: 4, seed: seed + 90, step: 16 });
+    } else if (hs === 'curly') {
+      for (let k = 0; k <= 13; k++) {
+        const a = Math.PI + (k / 13) * Math.PI;
+        G.ellipse(ctx, Math.cos(a) * 70, Math.sin(a) * 74 - 4, 26, 26, { fill: st.hair, lw: 3.5, seed: seed + 90 + k, amp: 1 });
+      }
+      for (const sd of [-1, 1]) {
+        G.ellipse(ctx, sd * 74, 12, 22, 24, { fill: st.hair, lw: 3.5, seed: seed + 105 + sd, amp: 1 });
+        G.ellipse(ctx, sd * 68, 36, 17, 18, { fill: st.hair, lw: 3.5, seed: seed + 108 + sd, amp: 1 });
+      }
+    } else if (hs === 'bun') {
+      G.ellipse(ctx, 0, -98, 32, 27, { fill: st.hair, lw: 4, seed: seed + 90 });
+      G.rrect(ctx, -16, -76, 32, 10, 4, { fill: shade(st.hair, 1.8), lw: 2.5, seed: seed + 91 });
+    } else if (hs === 'ponytail') {
+      G.poly(ctx, [[48, -62], [86, -52], [106, -12], [102, 48], [84, 94], [74, 42], [68, -8]], { fill: st.hair, lw: 4, seed: seed + 90, step: 14 });
+      G.rrect(ctx, 60, -56, 22, 16, 5, { fill: C.kit, lw: 2.5, seed: seed + 91 });
+    } else if (hs === 'hijab') {
+      G.poly(ctx, [[-80, -10], [-72, -62], [-40, -94], [0, -102], [40, -94], [72, -62], [80, -10], [86, 60], [100, 124], [62, 146], [0, 154], [-62, 146], [-100, 124], [-86, 60]], { fill: st.hijab, lw: 4, seed: seed + 90, step: 18, hatch: { color: 'rgba(0,0,0,0.12)', gap: 8 } });
+    }
     // ears
-    G.ellipse(ctx, -64, 6, 14, 18, { fill: st.skin, lw: 3.5, seed: seed + 21 });
-    G.ellipse(ctx, 64, 6, 14, 18, { fill: st.skin, lw: 3.5, seed: seed + 22 });
+    if (hs !== 'hijab') {
+      G.ellipse(ctx, -64, 6, 14, 18, { fill: st.skin, lw: 3.5, seed: seed + 21 });
+      G.ellipse(ctx, 64, 6, 14, 18, { fill: st.skin, lw: 3.5, seed: seed + 22 });
+    }
     G.ellipse(ctx, 0, 0, 64, 70, { fill: st.skin, lw: 4.5, seed: seed + 23, hatch: { color: 'rgba(120,60,30,0.14)', gap: 8 } });
-    // hair
-    G.poly(ctx, [[-66, 2], [-62, -40], [-40, -66], [-4, -80], [36, -76], [62, -52], [68, -8], [52, -30], [30, -44], [6, -40], [-18, -48], [-44, -36], [-56, -10]], { fill: st.hair, lw: 4, seed: seed + 25, step: 14 });
-    G.poly(ctx, [[-10, -78], [8, -96], [30, -86], [16, -74]], { fill: st.hair, lw: 3.5, seed: seed + 26, step: 10 });
+    // hair in front
+    const cap = [[-66, 2], [-62, -42], [-36, -70], [0, -78], [36, -70], [62, -42], [66, 2], [56, -30], [0, -50], [-56, -30]];
+    if (hs === 'quiff') {
+      G.poly(ctx, [[-66, 2], [-62, -40], [-40, -66], [-4, -80], [36, -76], [62, -52], [68, -8], [52, -30], [30, -44], [6, -40], [-18, -48], [-44, -36], [-56, -10]], { fill: st.hair, lw: 4, seed: seed + 25, step: 14 });
+      G.poly(ctx, [[-10, -78], [8, -96], [30, -86], [16, -74]], { fill: st.hair, lw: 3.5, seed: seed + 26, step: 10 });
+    } else if (hs === 'curlytop') {
+      // short sides, a mop of dark curls on top (Afaq's hair)
+      G.poly(ctx, [[-66, 4], [-64, -36], [-44, -64], [0, -74], [44, -64], [64, -36], [66, 4], [54, -22], [28, -34], [0, -36], [-28, -34], [-54, -22]], { fill: st.hair, lw: 4, seed: seed + 25, step: 14 });
+      const curls = [[-50, -58, 17], [-30, -74, 20], [-6, -82, 21], [18, -80, 20], [40, -68, 18], [56, -50, 14], [-40, -44, 13], [-16, -54, 14], [8, -58, 14], [30, -50, 13]];
+      curls.forEach(([cx, cy, r], k) => G.ellipse(ctx, cx, cy, r, r * 0.92, { fill: st.hair, lw: 3, seed: seed + 150 + k, amp: 0.9 }));
+      for (let k = 0; k < 6; k++) G.line(ctx, [[-40 + k * 16, -70 + (k % 2) * 10], [-34 + k * 16, -64 + (k % 2) * 10], [-38 + k * 16, -58 + (k % 2) * 10]], { lw: 2.2, color: 'rgba(255,255,255,0.18)', seed: seed + 165 + k, step: 4 });
+    } else if (hs === 'short') {
+      G.poly(ctx, [[-66, 0], [-63, -40], [-38, -68], [0, -78], [38, -70], [63, -42], [66, 0], [54, -28], [22, -42], [-14, -44], [-50, -30]], { fill: st.hair, lw: 4, seed: seed + 25, step: 14 });
+    } else if (hs === 'buzz') {
+      G.poly(ctx, [[-64, -6], [-60, -42], [-34, -66], [0, -72], [34, -66], [60, -42], [64, -6], [52, -30], [0, -50], [-52, -30]], { fill: st.hair, lw: 3, seed: seed + 25, step: 14, alpha: 0.85, hatch: { color: 'rgba(255,255,255,0.18)', gap: 4 } });
+    } else if (hs === 'long') {
+      G.poly(ctx, [[-66, 6], [-64, -40], [-40, -68], [-2, -80], [40, -72], [64, -44], [67, 4], [56, -24], [40, -38], [14, -44], [-6, -34], [-30, -46], [-54, -22]], { fill: st.hair, lw: 4, seed: seed + 25, step: 14 });
+    } else if (hs === 'curly') {
+      for (let k = 0; k < 6; k++) G.ellipse(ctx, -46 + k * 18.4, -54 + (k % 2) * 6, 15, 15, { fill: st.hair, lw: 3, seed: seed + 110 + k, amp: 0.8 });
+    } else if (hs === 'bun' || hs === 'ponytail') {
+      G.poly(ctx, cap, { fill: st.hair, lw: 4, seed: seed + 25, step: 14 });
+    } else if (hs === 'bald') {
+      G.line(ctx, [[-34, -54], [-12, -62]], { lw: 5, color: 'rgba(255,255,255,0.5)', seed: seed + 25 });
+    } else if (hs === 'hijab') {
+      const band = [];
+      for (let i = 0; i <= 20; i++) { const a = (150 + (i / 20) * 240) * Math.PI / 180; band.push([Math.cos(a) * 78, -2 + Math.sin(a) * 86]); }
+      for (let i = 20; i >= 0; i--) { const a = (150 + (i / 20) * 240) * Math.PI / 180; band.push([Math.cos(a) * 58, 8 + Math.sin(a) * 66]); }
+      G.shape(ctx, band, { fill: st.hijab, lw: 4, seed: seed + 25, hatch: { color: 'rgba(0,0,0,0.12)', gap: 8 } });
+    }
+    if (st.freckles) {
+      ctx.fillStyle = alpha(shade(st.skin, 0.6), 0.8);
+      for (const sd of [-1, 1]) for (const [dx, dy] of [[-6, 0], [4, -4], [8, 6], [-2, 9]]) { ctx.beginPath(); ctx.arc(sd * 36 + dx, 16 + dy, 2.2, 0, Math.PI * 2); ctx.fill(); }
+    }
+    // facial hair
+    const mx = look * 8, my = 40;
+    if (st.facialHair === 'stubble') {
+      ctx.save();
+      ctx.beginPath(); ctx.ellipse(0, 0, 63, 69, 0, 0, Math.PI * 2); ctx.clip();
+      ctx.beginPath(); ctx.rect(-70, 18, 140, 70); ctx.clip();
+      G.hatch(ctx, [-70, 18, 70, 80], { color: alpha(st.hair, 0.35), gap: 4, angle: 0.7, lw: 1.6, seed: seed + 120 });
+      ctx.restore();
+    } else if (st.facialHair === 'beard') {
+      G.poly(ctx, [[-64, -2], [-62, 34], [-44, 64], [-14, 80], [14, 80], [44, 64], [62, 34], [64, -2], [52, 16], [30, 26], [0, 30], [-30, 26], [-52, 16]], { fill: st.hair, lw: 4, seed: seed + 120, step: 14 });
+      G.ellipse(ctx, mx, my, 22, 11, { fill: st.skin, lw: 2, seed: seed + 121 });
+    } else if (st.facialHair === 'trimmed') {
+      // short, neat beard along the jaw, fuller at the chin, joined to a mustache
+      G.shape(ctx, [[-64, 0], [-62, 30], [-46, 58], [-20, 74], [0, 79], [20, 74], [46, 58], [62, 30], [64, 0], [56, 18], [40, 38], [20, 52], [0, 56], [-20, 52], [-40, 38], [-56, 18]], { fill: st.hair, lw: 3.5, seed: seed + 120, hatch: { color: 'rgba(255,255,255,0.12)', gap: 4 } });
+      G.poly(ctx, [[-24, 33], [-11, 27], [0, 30], [11, 27], [24, 33], [11, 36], [0, 34], [-11, 36]], { fill: st.hair, lw: 2.5, seed: seed + 121, step: 8 });
+      for (const sd of [-1, 1]) G.line(ctx, [[sd * 23, 34], [sd * 26, 50]], { lw: 5, color: st.hair, seed: seed + 122 + sd });
+    } else if (st.facialHair === 'mustache') {
+      G.poly(ctx, [[-28, 34], [-16, 26], [-2, 30], [2, 30], [16, 26], [28, 34], [16, 38], [0, 34], [-16, 38]], { fill: st.hair, lw: 2.5, seed: seed + 120, step: 8 });
+    }
     // brows
     const bl = { neutral: [0, 0], worried: [8, -6], up: [-6, -6], determined: [-8, 5] }[brows] || [0, 0];
     for (const sd of [-1, 1]) {
@@ -262,6 +412,22 @@
         if (h > 6) { ctx.fillStyle = '#FFF'; ctx.beginPath(); ctx.arc(cx - w * 0.18, cy - h * 0.2, wide ? 3.2 : 2.4, 0, Math.PI * 2); ctx.fill(); }
       }
     }
+    // glasses
+    if (st.glasses === 'round' || st.glasses === 'square' || st.glasses === 'sun') {
+      const gx = look * 10;
+      const sun = st.glasses === 'sun';
+      const frame = st.glassesColor || (sun ? '#C9A063' : C.ink);
+      for (const sd of [-1, 1]) {
+        if (st.glasses === 'square') G.rrect(ctx, sd * 26 + gx - 19, -20, 38, 29, 7, { fill: 'rgba(255,255,255,0.16)', lw: 4, stroke: frame, seed: seed + 125 + sd });
+        else G.ellipse(ctx, sd * 27 + gx, -6, sun ? 20 : 18, sun ? 17 : 17, { fill: sun ? '#34323D' : 'rgba(255,255,255,0.16)', lw: sun ? 5 : 4, stroke: frame, seed: seed + 125 + sd, second: !sun });
+        if (sun) {
+          G.line(ctx, [[sd * 27 + gx - 11, -9], [sd * 27 + gx - 2, -18]], { lw: 3.5, color: 'rgba(255,255,255,0.6)', seed: seed + 131 + sd });
+          G.line(ctx, [[sd * 27 + gx + 2, -3], [sd * 27 + gx + 7, -8]], { lw: 2.5, color: 'rgba(255,255,255,0.4)', seed: seed + 133 + sd });
+        }
+        G.line(ctx, [[sd * (sun ? 47 : 44) + gx, -9], [sd * 62, -4]], { lw: 3.5, color: frame, seed: seed + 128 + sd });
+      }
+      G.line(ctx, [[-7 + gx, -10], [7 + gx, -10]], { lw: 3.5, color: frame, seed: seed + 130 });
+    }
     // nose
     G.line(ctx, [[-2 + look * 6, 8], [6 + look * 6, 20], [-4 + look * 6, 24]], { lw: 3.5, seed: seed + 35, color: st.skinDark });
     // cheeks
@@ -273,8 +439,8 @@
       ctx.restore();
     }
     // mouth
-    const mx = look * 8, my = 40;
     if (mouth === 'flat') G.line(ctx, [[mx - 14, my], [mx + 14, my]], { lw: 4.5, seed: seed + 37 });
+    else if (mouth === 'smirk') G.line(ctx, [[mx - 15, my + 1], [mx + 2, my + 4], [mx + 18, my - 7]], { lw: 4.5, seed: seed + 42 });
     else if (mouth === 'wavy') G.line(ctx, [[mx - 18, my], [mx - 9, my - 5], [mx, my], [mx + 9, my - 5], [mx + 18, my]], { lw: 4, seed: seed + 38, step: 6 });
     else if (mouth === 'smile') G.line(ctx, [[mx - 16, my - 4], [mx, my + 6], [mx + 16, my - 4]], { lw: 4.5, seed: seed + 39 });
     else if (mouth === 'o' || mouth === 'sleep') G.ellipse(ctx, mx, my + 2, mouth === 'o' ? 9 : 6, mouth === 'o' ? 11 : 6, { fill: '#3A1D1A', lw: 3, seed: seed + 40 });
@@ -307,10 +473,35 @@
       G.line(ctx, [[50, 18], [62, 26]], { lw: 3, seed: seed + 47, color: 'rgba(120,80,20,0.6)' });
       ctx.restore();
     }
-    drawArm(SL, armL, -1);
-    drawArm(SR, armR, 1);
+    if (crossArms) {
+      const sleeve = sleeves === 'none' ? st.skin : dark ? shade(st.shirt, 1.45) : st.shirt;
+      const long = sleeves === 'long';
+      const ey = sh + 92;
+      for (const sd of [-1, 1]) {
+        const S = sd < 0 ? SL : SR;
+        G.limb(ctx, [S, [sd * 94 * bw, ey - 10]], { color: long ? sleeve : st.skin, lw: 32, seed: seed + 170 + sd });
+        if (!long && sleeves === 'short') G.limb(ctx, [[S[0] - sd * 4, S[1] - 6], [S[0] + sd * 8, S[1] + 34]], { color: st.shirt, lw: 36, seed: seed + 172 + sd });
+      }
+      // lower forearm (tucked hand on the right), then the upper forearm on top (hand on the left)
+      G.limb(ctx, [[-96 * bw, ey + 4], [0, ey + 10], [80 * bw, ey + 2]], { color: long ? sleeve : st.skin, lw: 34, seed: seed + 174 });
+      G.ellipse(ctx, 84 * bw, ey - 8, 17, 15, { fill: st.skin, lw: 3.5, seed: seed + 175 });
+      G.limb(ctx, [[96 * bw, ey + 24], [0, ey + 30], [-80 * bw, ey + 20]], { color: long ? sleeve : st.skin, lw: 34, seed: seed + 176 });
+      G.ellipse(ctx, -86 * bw, ey + 10, 17, 15, { fill: st.skin, lw: 3.5, seed: seed + 177 });
+    } else {
+      drawArm(SL, armL, -1);
+      drawArm(SR, armR, 1);
+    }
     if (blanket) Ch.blanket(ctx, sh, hip, seed + 50);
     ctx.restore();
+  };
+
+  // Named looks. Use: Ch.person(ctx, { ..., style: Ch.STYLES.afaq })  or extend: { ...Ch.STYLES.afaq, glasses: 'none' }
+  Ch.STYLES = {
+    // Afaq (github.com/i-afaqrashid), who made this plugin: curly black hair, trimmed beard,
+    // round gold sunglasses, black shalwar kameez, arms crossed with a smirk (pass crossArms: true, mouth: 'smirk').
+    afaq: { skin: '#C68B61', hair: '#1C1715', hairStyle: 'curlytop', facialHair: 'trimmed', glasses: 'sun', outfit: 'kameez', shirt: '#24232A', bottoms: 'shalwar', shorts: '#24232A', build: 'broad', shoes: '#4A3A32' },
+    // the same Afaq as a football fan in the custom #10 jersey (eyes visible for acting)
+    afaqFan: { skin: '#C68B61', hair: '#1C1715', hairStyle: 'curlytop', facialHair: 'trimmed', outfit: 'jersey', name: 'AFAQ', number: '10', build: 'broad' },
   };
 
   // a scarf laid over a sitting person like a blanket

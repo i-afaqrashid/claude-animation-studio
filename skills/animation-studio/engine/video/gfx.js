@@ -516,6 +516,29 @@
     ctx.restore();
   };
 
+  // a user's own image (photo, logo, drawing) as a taped paper print, so it sits in the hand-drawn world.
+  // img comes from Studio.loadImage('assets/xyz.png') inside Studio.film({ init }). Cover-fits the frame.
+  G.photo = (ctx, img, x, y, w, h, { rot = 0, seed = 1, caption = '', border = 18, tape = true } = {}) => {
+    const bottom = caption ? border * 3.2 : border;
+    const W2 = w + border * 2, H2 = h + border + bottom;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    G.tornPaper(ctx, -W2 / 2, -H2 / 2, W2, H2, { fill: '#FBF8F0', seed, tear: 1.5, edge: null });
+    if (img && img.width) {
+      const ir = img.width / img.height, r = w / h;
+      let sw = img.width, sh = img.height, sx = 0, sy = 0;
+      if (ir > r) { sw = img.height * r; sx = (img.width - sw) / 2; } else { sh = img.width / r; sy = (img.height - sh) / 2; }
+      ctx.drawImage(img, sx, sy, sw, sh, -W2 / 2 + border, -H2 / 2 + border, w, h);
+    }
+    ctx.strokeStyle = 'rgba(40,30,20,0.35)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-W2 / 2 + border, -H2 / 2 + border, w, h);
+    if (caption) G.text(ctx, caption, 0, H2 / 2 - bottom * 0.3, { size: bottom * 0.52, align: 'center' });
+    if (tape) G.tape(ctx, 0, -H2 / 2 + 4, 110, 30, 0.04, seed + 3);
+    ctx.restore();
+  };
+
   G.star = (ctx, x, y, r, { fill = G.C.gold, rot = 0, seed = 1, lw = 3 } = {}) => {
     const pts = [];
     for (let i = 0; i < 10; i++) {

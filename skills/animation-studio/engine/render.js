@@ -29,7 +29,7 @@ function findChrome() {
 }
 const CHROME = findChrome();
 
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.ttf': 'font/ttf', '.otf': 'font/otf', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.json': 'application/json' };
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.ttf': 'font/ttf', '.otf': 'font/otf', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.json': 'application/json' };
 let PAGE = null;
 // Serve over HTTP: Chrome refuses @font-face / FontFace loads from file:// URLs.
 function serve() {
@@ -130,7 +130,16 @@ async function attach(proc, ws, dir, tag) {
     await sleep(50);
   }
   if (!(await evaluate(c, 'window.READY === true'))) throw new Error('page never set window.READY — check the console errors above');
-  return { c, close() { c.close(); proc.kill('SIGKILL'); launched.delete(proc); fs.rmSync(dir, { recursive: true, force: true }); } };
+  return {
+    c,
+    close() {
+      c.close();
+      proc.kill('SIGKILL');
+      launched.delete(proc);
+      // Chrome may still be flushing its temp profile for a moment after the kill: retry, never crash
+      try { fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); } catch (e) { /* leftover temp dir is harmless */ }
+    },
+  };
 }
 
 async function grab(w, t) {

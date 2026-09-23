@@ -2,8 +2,8 @@
 (function () {
   const U = globalThis.U, G = globalThis.G, Ch = globalThis.Ch, S = globalThis.SCORE, C = G.C;
   const R = {};
-  // Afaq = the engine's generic person, wearing a custom #10 jersey
-  Ch.afaq = (ctx, o) => Ch.person(ctx, Object.assign({}, o, { style: Object.assign({ name: 'AFAQ', number: '10' }, o.style || {}) }));
+  // Afaq = the real Afaq (curly hair, trimmed beard) in his custom #10 jersey: the engine's Ch.STYLES.afaqFan preset
+  Ch.afaq = (ctx, o) => Ch.person(ctx, Object.assign({}, o, { style: Object.assign({}, Ch.STYLES.afaqFan, o.style || {}) }));
   const W = G.W, H = G.H;
 
   const hex = (c) => { const n = parseInt(c.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };

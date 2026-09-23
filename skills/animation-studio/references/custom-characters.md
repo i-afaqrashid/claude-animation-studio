@@ -1,0 +1,65 @@
+# Characters: presets, customizing people, building new ones, using real images
+
+Nobody is locked into fixed characters. There are four levels, from least to most work.
+
+## 1. Presets (`Ch.STYLES`)
+
+Named looks ready to use: `Ch.person(ctx, { x, y, pose: 'stand', style: Ch.STYLES.afaq })`.
+- `afaq`: Afaq, who made this plugin. Curly black hair (`curlytop`), trimmed beard + mustache, round gold sunglasses, black shalwar kameez, broad build. Signature pose: `crossArms: true, mouth: 'smirk'`.
+- `afaqFan`: the same Afaq in the custom #10 "AFAQ" football jersey, with eyes visible for acting. The World Cup example uses it.
+
+Extend a preset instead of copying it: `style: { ...Ch.STYLES.afaq, glasses: 'none' }`. Sunglasses hide the eyes, so take them off for emotional close-ups. To add a preset for a recurring person, add an entry to `Ch.STYLES` in the film (or in the engine, for a published skill).
+
+## 2. Customizing `Ch.person` (the `style` object)
+
+All fields are optional; defaults draw the original jersey look.
+
+| field | values |
+|---|---|
+| `skin`, `skinDark` | any colour; `skinDark` (neck, nose) is derived if omitted. `Ch.SKIN_TONES` has 6 swatches |
+| `hair` | any colour (also brows and facial hair). `Ch.HAIR_COLORS` has swatches |
+| `hairStyle` | `quiff` (default), `short`, `buzz`, `curlytop`, `long`, `curly` (big curls), `bun`, `ponytail`, `bald`, `hijab` |
+| `hijab` | hijab colour |
+| `facialHair` | `none`, `stubble`, `mustache`, `trimmed` (short beard + mustache), `beard` |
+| `glasses`, `glassesColor` | `none`, `round`, `square`, `sun` (round sunglasses, gold frames by default) |
+| `outfit` | `jersey` (side panels, `name` + `number`), `tee`, `hoodie`, `shirt` (collar, buttons, pocket), `dress`, `kameez` (long shirt to the knees) |
+| `shirt`, `trim`, `collar` | outfit colours (dark fabrics get light seams automatically) |
+| `bottoms`, `shorts` | `shorts`, `pants`, `shalwar` (loose trousers), `skirt`; `shorts` is the bottoms colour |
+| `sleeves` | `short`, `long`, `none` (default depends on the outfit) |
+| `build` | `slim`, `regular`, `broad` |
+| `print`, `printColor` | big text on a tee or hoodie |
+| `freckles`, `shoes`, `name`, `number` | as named |
+
+Acting parameters (per frame, not style): `eyes`, `brows`, `mouth` (`flat wavy smile smirk grin open o sleep`), `look`, `lookY`, `blink`, `headRot`, `handL`/`handR` hand targets, `crossArms`, `knee`, `pillow`, `sweat`, `blush`, `legBend`, `scarf`, `blanket`.
+
+When personalizing for a real viewer, ask for (or read from a photo they share) hair style and colour, facial hair, glasses, skin tone, typical clothing and one signature pose. Map each to the table above, and keep the cartoon kind and flattering. Never store or publish the photo itself; only the style description goes into code.
+
+## 3. Building a new character from primitives
+
+For pets, robots, vehicles, mascots, products, and creatures, write `Ch.<name>(ctx, o)` in a film file. The complete worked example is `examples/characters/cat.js` (`Ch.cat`: tabby/tuxedo/plain patterns, expressions, a waving tail, a collar and bell, a party hat). Copy it next to `film.js` and load it in `index.html` after `engine/video/boot.js`.
+
+The recipe:
+1. **Origin at the feet.** Apply `translate(x, y) → shadow → scale(s·sx, s·sy) → rotate(rot)`, then build upward in local units. Squash/stretch and hops then work exactly like Claude's.
+2. **Draw back to front**: tail/back hair → haunches/body → limbs → head → face → accessories.
+3. **Use only `G.*` for shapes** (`G.poly`, `G.ellipse`, `G.rrect`, `G.limb`, `G.line`) with `fill`, ink outline and `hatch`, so the character boils and hatches like the rest of the film.
+4. **Give every part its own seed** (`seed + n`) so each part's jitter is stable and independent.
+5. **Expressions are parameters.** Eyes (`normal/wide/happy/closed`), mouth and one or two signature moves (tail wave, ear wiggle) are driven from the score in `film.js`.
+6. **Patterns and markings**: clip to the body path (`ctx.clip()` after `G.path`), draw stripes or patches, then restore.
+7. **Test in isolation first**: render a still with the character in 3–4 expressions side by side before animating.
+
+## 4. Using real images (photos, logos, drawings)
+
+Put files in `<project>/assets/`. Load them once in `init` and draw them every frame:
+
+```js
+let photo;
+Studio.film({
+  async init() { photo = await Studio.loadImage('assets/team.jpg'); },
+  draw(ctx, t) {
+    G.photo(ctx, photo, 1500, 540, 480, 320, { rot: -0.05, caption: 'summer 2026', seed: 3 }); // a taped paper print
+    // or raw: ctx.drawImage(photo, x, y, w, h)
+  },
+});
+```
+
+`G.photo` cover-fits the image into a paper print with a torn border, tape and an optional handwritten caption, so a real photo sits naturally in the hand-drawn world. Logos usually look best raw (`ctx.drawImage`) on a torn paper card (`G.tornPaper`). The paper-grain post pass is applied over images too. Supported formats: png, jpg/jpeg, webp, gif, svg. Only use images the user provided or owns.
