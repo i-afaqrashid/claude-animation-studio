@@ -215,7 +215,7 @@ function speak(lines, { out = 'out', engine = process.env.ANIM_TTS, voice, rate,
   }
   const vo = {
     engine: eng,
-    lines: placed.map((p) => ({ t: +p.l.at.toFixed(3), end: +(p.l.at + p.dur).toFixed(3), text: clean(p.l.text), ...(p.l.alt ? { alt: p.l.alt } : {}), ...(p.l.who ? { who: p.l.who } : {}), words: p.words })),
+    lines: placed.map((p) => ({ t: +p.l.at.toFixed(3), end: +(p.l.at + p.dur).toFixed(3), text: clean(p.l.text), ...(p.l.display ? { display: p.l.display } : {}), ...(p.l.alt ? { alt: p.l.alt } : {}), ...(p.l.who ? { who: p.l.who } : {}), words: p.words })),
     mouth: mouthTrack(bus, fps),
   };
   if (save) { fs.writeFileSync(path.join(out, 'voice.json'), JSON.stringify(vo)); }

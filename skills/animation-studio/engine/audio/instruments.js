@@ -804,7 +804,41 @@ function scribble(len, seed = 31) {
   return out;
 }
 
+// glass breaking: a sharp crack, then many bright shards ringing and tinkling down for a second
+function glass(seed = 1, { size = 1 } = {}) {
+  const out = buf(1.6);
+  const r = rng(seed), w = rng(seed * 7 + 3);
+  const hp = new SVF();
+  for (let i = 0; i < out.length; i++) { const t = i / SR; out[i] = hp.hp(w(), 2500, 0.7) * Math.exp(-t / 0.012) * 1.2 * size; }
+  // shards: short inharmonic pings (each a few detuned partials) scattered over a falling time curve
+  for (let k = 0; k < 70; k++) {
+    const t0 = Math.pow(Math.abs(r()), 1.8) * 1.1, f = 2200 + Math.abs(r()) * 6500, dec = 0.02 + Math.abs(r()) * 0.08, g = (0.12 + Math.abs(r()) * 0.25) * Math.exp(-t0 * 1.8);
+    const s0 = Math.floor(t0 * SR);
+    for (let i = 0; i < SR * dec * 5 && s0 + i < out.length; i++) {
+      const t = i / SR, e = Math.exp(-t / dec) * g;
+      out[s0 + i] += e * (Math.sin(TAU * f * t) + 0.6 * Math.sin(TAU * f * 1.51 * t) + 0.4 * Math.sin(TAU * f * 2.37 * t));
+    }
+  }
+  let pk = 0; for (let i = 0; i < out.length; i++) pk = Math.max(pk, Math.abs(out[i]));
+  for (let i = 0; i < out.length; i++) out[i] *= 0.9 / pk;
+  return out;
+}
+// a record scratch (the music stops): a noisy tone swept down fast, then back up a little
+function scratch(len = 0.32) {
+  const out = buf(len);
+  const w = rng(91), bp = new SVF();
+  let ph = 0;
+  for (let i = 0; i < out.length; i++) {
+    const u = i / out.length, f = u < 0.7 ? 900 * Math.pow(0.12, u / 0.7) + 60 : 170 + (u - 0.7) * 900;
+    ph += f / SR;
+    const saw = 2 * (ph % 1) - 1;
+    out[i] = Math.tanh((bp.bp(w(), f * 3, 1.2) * 1.2 + saw * 0.5) * 1.5) * Math.sin(Math.PI * u) * 0.8;
+  }
+  return out;
+}
+
 module.exports = {
+  glass, scratch,
   kick, snare, clap, hat, crash, tom, shaker, bell, bass, padNote, pluck, guitar, epiano, musicBox, marimba, brassNote, voice,
   dholak, tabla, harmonium, ting, pulse, triangle, chipNoise, supersaw, bass808, strings, pizz, timpani, logDrum, rim, vinyl,
   noiseSweep, boing, thud, paperFwip, tvClick, whistle, bwomp, heartbeat, woodTick, thwack, subBoom, pop,

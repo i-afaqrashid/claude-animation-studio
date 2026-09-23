@@ -58,6 +58,12 @@ Reading it: sound ±20 ms and picture ±1 frame pass. The picture counts the pix
 | `verify` says a logo is 2 frames early after a circle wipe | the wipe's last frames change more pixels than a small logo popping in | close the wipe AT the marker and hard-cut to the end card there (`app-promo` does this) |
 | The status bar vanishes on a dark app screen | dark text on dark | `UI.phone(…, { dark: true })` for camera/dark screens |
 | Workers render different frames for the same t (flicker, jumping confetti) | `Math.random()` / `Date.now()` in a film file | seeded `U.mulberry32` in score.js, `U.hash(i, t)` in film.js; render commands now warn about these |
+| `verify` says a sound is -150 ms (at the edge of its window) | a drum roll or pickup rises *into* the marker, so the steepest rise is before it | end the roll an 8th early and leave a held breath (`MIX.gate`), then hit on the marker (qawwali-night) |
+| `verify` shows `?` for a moment that "obviously" happens | a slow whoosh or a fade has no sharp edge | a real transient on the marker (a pop, a thud) + a flash or cut in the picture (birthday-card's blow) |
+| Seated qawwals/audiences look like they sit on chairs | `pose: 'sit'` is a chair sit | `pose: 'floor'` (cross-legged) and put instruments in front of the legs |
+| Caption words touch each other when one pops | the popped word scaled from its centre into the gap | fixed in `Subs.draw`: a word pops from its left edge, the gap is ≥ 0.3 em |
+| Beats of a swung song (lo-fi) land 140 ms early now and then | the tracker locked onto a swung 8th | fixed: tighter tempo tracking + outlier beats moved back onto their neighbours' line; check `out/analysis.svg` |
+| Map borders draw a line across the whole world | a country that crosses the date line (Russia, Fiji) | fixed in `Data.drawMap` (rings are unwrapped past 180°) |
 | Emotions don't read on a character | sunglasses/hair over the eyes, or all expressions look alike | `render.js cast`: 6 expressions side by side; take the glasses off for emotional beats |
 
 ## Etiquette on the user's machine

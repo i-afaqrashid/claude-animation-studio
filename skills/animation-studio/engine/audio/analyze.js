@@ -113,7 +113,7 @@ function tempo(env, { prior = 120, lo = 55, hi = 215, hint = null } = {}) {
 }
 
 // beats by dynamic programming (Ellis 2007): reward onsets, penalise deviating from the period
-function trackBeats(env, period, { tightness = 100 } = {}) {
+function trackBeats(env, period, { tightness = 400 } = {}) {
   const n = env.length;
   // local score: the envelope smoothed by a Gaussian of width period/32
   const half = Math.round(period), win = [];
@@ -139,7 +139,32 @@ function trackBeats(env, period, { tightness = 100 } = {}) {
   const rms = Math.sqrt(mean(strength.map((v) => v * v)));
   while (beats.length && local[beats[0]] < 0.5 * rms) beats.shift();
   while (beats.length && local[beats[beats.length - 1]] < 0.5 * rms) beats.pop();
-  return beats;
+  return regularize(beats, period, local);
+}
+// a beat that sits well off the local grid (a swung 8th, a quiet stretch with no drums) is moved back
+// onto the line through its neighbours, unless it has a strong onset of its own
+function regularize(beats, period, local) {
+  const out = beats.slice();
+  const strong = Math.max(...beats.map((b) => local[b])) * 0.6;
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = 0; i < out.length; i++) {
+      const nb = [];
+      for (let k = Math.max(0, i - 4); k <= Math.min(out.length - 1, i + 4); k++) if (k !== i) nb.push([k, out[k]]);
+      if (nb.length < 3) continue;
+      // least-squares line through the neighbours (index → frame)
+      const mk = nb.reduce((a, [k]) => a + k, 0) / nb.length, mf = nb.reduce((a, [, f]) => a + f, 0) / nb.length;
+      let sxy = 0, sxx = 0; for (const [k, f] of nb) { sxy += (k - mk) * (f - mf); sxx += (k - mk) ** 2; }
+      const pred = mf + (sxy / sxx) * (i - mk);
+      if (Math.abs(out[i] - pred) > 0.12 * period && local[out[i]] < strong) out[i] = Math.round(pred);
+    }
+  }
+  // the ends (a fade-out, a free intro): continue the steady grid of the 8 beats next to them
+  const line = (idx) => { const mk = idx.reduce((a, k) => a + k, 0) / idx.length, mf = idx.reduce((a, k) => a + out[k], 0) / idx.length; let sxy = 0, sxx = 0; for (const k of idx) { sxy += (k - mk) * (out[k] - mf); sxx += (k - mk) ** 2; } return (i) => mf + (sxy / sxx) * (i - mk); };
+  if (out.length > 12) {
+    for (let i = out.length - 4; i < out.length; i++) { const f = line([...Array(8).keys()].map((k) => out.length - 12 + k)); if (Math.abs(out[i] - f(i)) > 0.06 * period && local[out[i]] < strong) out[i] = Math.round(f(i)); }
+    for (let i = 3; i >= 0; i--) { const f = line([...Array(8).keys()].map((k) => 4 + k)); if (Math.abs(out[i] - f(i)) > 0.06 * period && local[out[i]] < strong) out[i] = Math.round(f(i)); }
+  }
+  return out;
 }
 
 // 12-bin chroma per frame (from a longer FFT, for pitch resolution)

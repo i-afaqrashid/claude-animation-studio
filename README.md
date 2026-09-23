@@ -8,6 +8,16 @@ https://github.com/user-attachments/assets/9168dc15-a663-4611-a5de-5dd5a20bd7b9
 
 *An 18-second moment from "Claude × Afaq, World Cup 2026", a 58-second film Claude made with this skill. The frames and the soundtrack come from zero samples, stock clips, or music libraries: drums, bass, brass, the crowd, and a street chanting "o-lé".*
 
+## Demo films
+
+Every film below was made with this plugin: the pictures, the music, the singing and the voices are all code. The GIFs are silent; click one to watch the MP4 **with sound**. Each one is a starter you can remix: `new-project.js my-film --from <name>`.
+
+| | |
+|:--:|:--:|
+| [![Qawwali Night](docs/gallery/qawwali-night.gif)](https://github.com/i-afaqrashid/claude-animation-studio/releases/download/demos/qawwali-night.mp4)<br>**Qawwali Night** · `qawwali-night` · 16:9 · 43s<br>An original qawwali that speeds up from 88 to 152 BPM. The lead sings in Roman Urdu with Nastaliq captions, and the chorus answers. Harmonium, tabla and taali play, and the crowd showers the stage with notes and petals. | [![Gully Cricket](docs/gallery/gully-cricket.gif)](https://github.com/i-afaqrashid/claude-animation-studio/releases/download/demos/gully-cricket.mp4)<br>**Gully Cricket** · `gully-cricket` · 9:16 · 27s<br>Last ball, six to win. Chacha commentates (a real voiceover, lip-synced): THWACK, it's up… it's up… SIX! Then aunty's window. |
+| [![Chai aur Baarish](docs/gallery/lyric-video.gif)](https://github.com/i-afaqrashid/claude-animation-studio/releases/download/demos/lyric-video.mp4)<br>**Chai aur Baarish** · `lyric-video` · 9:16 · 29s<br>A lyric video cut to a song with `analyze`: its beats, bars and word-timed lyrics. The song itself is lo-fi made in code. | [![Happy Birthday](docs/gallery/birthday-card.gif)](https://github.com/i-afaqrashid/claude-animation-studio/releases/download/demos/birthday-card.mp4)<br>**Happy Birthday, Ayesha** · `birthday-card` · 1:1 · 22s<br>A watercolour card that sings "Happy Birthday" with any name, and the candles blow out on the last note. |
+| [![Animation Studio launch](docs/gallery/product-launch.gif)](https://github.com/i-afaqrashid/claude-animation-studio/releases/download/demos/product-launch.mp4)<br>**The launch film** · `product-launch` · 16:9 · 36s<br>A voiceover with word-exact captions, six looks, four genres, a parade, a map and a chart. | [▶ **Pantrio**](https://github.com/i-afaqrashid/claude-animation-studio/releases/download/demos/app-promo-pantrio.mp4) · `app-promo` · 9:16 · 20s<br>An app promo made with the UI kit (a fictional app).<br><br>[▶ **Claude × Afaq, World Cup 2026**](https://github.com/i-afaqrashid/claude-animation-studio/releases/download/demos/world-cup-2026.mp4) · 16:9 · 58s<br>The film that started it all. |
+
 ## What it does
 
 Ask Claude for a video, and it:
@@ -76,7 +86,7 @@ Add `--style neon` (or `flat`, `pixel`, `chalk`, `watercolor`) to any command to
 
 Times can be seconds, `bar:beat` (`8:2`), or a named moment from the score (`@drop`, `@drop+0.5`).
 
-Add `--from app-promo` for a 9:16 app promo built with the UI kit (a fictional app), or `--from world-cup-2026` to re-render or remix the full 58s reference film.
+Start from a demo with `--from <name>`: `app-promo`, `product-launch`, `qawwali-night`, `gully-cricket`, `birthday-card`, `lyric-video`, or `world-cup-2026` (to re-render or remix the original 58s film).
 
 ## What's inside
 
@@ -86,8 +96,8 @@ skills/animation-studio/
 ├── references/           storytelling, music cookbook, visual style, engine API, gotchas
 ├── engine/               synth (DSP, instruments, mixing), drawing toolkit, characters, renderer
 ├── template/             a 23s starter film (any format)
-├── examples/app-promo/        a 20s vertical app promo (UI kit)
-├── examples/world-cup-2026/   the full reference film
+├── examples/             starters: app-promo, product-launch, qawwali-night, gully-cricket,
+│                         birthday-card, lyric-video, world-cup-2026 (see references/starters.md)
 └── scripts/new-project.js     scaffolds a new film
 ```
 

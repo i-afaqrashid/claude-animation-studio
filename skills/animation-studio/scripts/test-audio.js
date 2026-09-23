@@ -27,7 +27,7 @@ const mono = {
   bell: () => I.bell(880, 0.5, 2, 1.4), bass: () => I.bass(m('A2'), 0.5), pluck: () => I.pluck(m('A4')), guitar: () => I.guitar(m('A3'), 0.6), epiano: () => I.epiano(m('A4'), 0.5),
   musicBox: () => I.musicBox(m('A5')), marimba: () => I.marimba(m('A4')), dholak: () => I.dholak('ghe'), tabla: () => I.tabla('dha'), ting: () => I.ting(m('E6')),
   pulse: () => I.pulse(m('A4'), 0.3), triangle: () => I.triangle(m('A3'), 0.3), chipNoise: () => I.chipNoise('snare'), bass808: () => I.bass808(m('A1'), 0.6),
-  pizz: () => I.pizz(m('A4')), timpani: () => I.timpani(m('A2')), logDrum: () => I.logDrum(m('A2')), rim: () => I.rim(),
+  pizz: () => I.pizz(m('A4')), glass: () => I.glass(), scratch: () => I.scratch(), timpani: () => I.timpani(m('A2')), logDrum: () => I.logDrum(m('A2')), rim: () => I.rim(),
 };
 for (const [name, f] of Object.entries(mono)) { const x = f(); ok(`${name} renders`, x.length > 100 && finite(x) && peak(x) > 0.05 && peak(x) < 2.5, `peak ${peak(x).toFixed(2)}`); }
 for (const [name, f] of Object.entries({ padNote: () => I.padNote(m('A3'), 0.6), brassNote: () => I.brassNote(m('A3'), 0.5), harmonium: () => I.harmonium(m('A3'), 0.6) })) { const x = f(); ok(`${name} renders (stereo)`, finite(x.L) && finite(x.R) && peak(x.L) > 0.05 && peak(x.L) < 2.5, `peak ${peak(x.L).toFixed(2)}`); }

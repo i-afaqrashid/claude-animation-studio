@@ -215,6 +215,15 @@ const probe = (file) => JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-sho
   const kOut = kr.stdout + kr.stderr;
   pass('maps, pins, routes, counters, charts, gestures, outfits and animals draw without errors', kr.status === 0 && !/EXCEPTION|Error/.test(kOut) && fs.existsSync(path.join(kit, 'out', 'stills', 't_001.50.png')), kOut.slice(-300));
 
+  // 9. every starter scaffolds and draws its storyboard (no music needed for that)
+  for (const ex of ['qawwali-night', 'gully-cricket', 'birthday-card', 'lyric-video', 'product-launch']) {
+    const dir = path.join(tmp, `ex-${ex}`);
+    const sx = spawnSync(process.execPath, [path.join(SKILL, 'scripts', 'new-project.js'), dir, '--from', ex], { encoding: 'utf8' });
+    const bx = sx.status === 0 && spawnSync(process.execPath, ['engine/render.js', 'board'], { cwd: dir, encoding: 'utf8', timeout: 300000 });
+    const out = bx ? bx.stdout + bx.stderr : sx.stdout + sx.stderr;
+    pass(`example ${ex}: scaffold + storyboard`, !!bx && bx.status === 0 && /board written/.test(out) && !/EXCEPTION|Error:/.test(out), out.split('\n').filter(Boolean).pop());
+  }
+
   const failed = results.filter((r) => !r.ok).length;
   console.log(`\n${results.length - failed}/${results.length} checks passed${failed ? '' : ' — engine OK'}`);
   if (!failed) fs.rmSync(tmp, { recursive: true, force: true }); else console.log(`(kept ${tmp} for inspection)`);

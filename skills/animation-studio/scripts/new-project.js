@@ -3,6 +3,11 @@
 //   node <skill>/scripts/new-project.js <target-dir>                       -> starter template (23s demo film)
 //   node <skill>/scripts/new-project.js <target-dir> --format 9:16          -> the template, laid out vertically (also 1:1, 4:5)
 //   node <skill>/scripts/new-project.js <target-dir> --from app-promo      -> a 9:16 app promo built with the UI kit
+//   node <skill>/scripts/new-project.js <target-dir> --from qawwali-night  -> 16:9 qawwali: tempo map, singers, harmonium, tabla, Urdu captions
+//   node <skill>/scripts/new-project.js <target-dir> --from gully-cricket  -> 9:16 comic escalation: TTS commentary, lip-sync, shots, SFX
+//   node <skill>/scripts/new-project.js <target-dir> --from birthday-card  -> 1:1 watercolour card: Happy Birthday sung with a NAME
+//   node <skill>/scripts/new-project.js <target-dir> --from lyric-video    -> 9:16 lyric video on an analysed song (analyze → beats.js)
+//   node <skill>/scripts/new-project.js <target-dir> --from product-launch -> 16:9 launch: voiceover, captions, counters, style + genre montage
 //   node <skill>/scripts/new-project.js <target-dir> --from world-cup-2026 -> re-render/remix the 58s reference film (older API)
 // The engine is vendored (copied) so each film keeps working even if the skill is updated later.
 const fs = require('fs');
@@ -18,7 +23,7 @@ const format = valueOf('--format');
 const FORMATS = ['16:9', '9:16', '1:1', '4:5'];
 
 if (!target) {
-  console.log('usage: node new-project.js <target-dir> [--format 16:9|9:16|1:1|4:5] [--from app-promo|world-cup-2026]');
+  console.log(`usage: node new-project.js <target-dir> [--format 16:9|9:16|1:1|4:5] [--from ${fs.readdirSync(path.join(SKILL, 'examples')).filter((d) => d !== 'characters').join('|')}]`);
   process.exit(1);
 }
 if (format && !FORMATS.includes(format)) {

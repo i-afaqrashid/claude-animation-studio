@@ -27,6 +27,7 @@
   Subs.fromVoice = (vo, { maxWords = 7, hold = 0.5 } = {}) => {
     const out = [];
     for (const l of (vo && vo.lines) || []) {
+      if (l.display) { out.push({ t: l.t, end: l.end + hold, text: l.display, ...(l.alt ? { alt: l.alt } : {}), ...(l.who ? { who: l.who } : {}) }); continue; }
       const ws = l.words && l.words.length ? l.words : Subs.words(l);
       let i = 0;
       while (i < ws.length) {
@@ -67,7 +68,7 @@
     const wrap = (ctx, words, size, font, maxW) => {
       const lines = [[]];
       let w = 0;
-      const sp = G.measure(ctx, ' ', size, font, 800);
+      const sp = Math.max(G.measure(ctx, ' ', size, font, 800), size * 0.3);
       for (const wd of words) {
         const ww = G.measure(ctx, wd.w, size, font, 800);
         if (lines[lines.length - 1].length && w + sp + ww > maxW) { lines.push([]); w = 0; }
@@ -106,7 +107,7 @@
       }
       let k = 0;
       lines.forEach((ln, li) => {
-        const sp = G.measure(ctx, ' ', size, fontName, 800);
+        const sp = Math.max(G.measure(ctx, ' ', size, fontName, 800), size * 0.3); // a real word gap, and room for the popped word
         const widths = ln.map((w) => G.measure(ctx, w.w, size, fontName, 800));
         const total = widths.reduce((a, b) => a + b, 0) + sp * (ln.length - 1);
         let x = cx - total / 2;
@@ -119,7 +120,7 @@
           const pop = style === 'pop' && isCur ? 1 + 0.18 * Math.max(0, 1 - (t - w.t) / 0.12) : 1;
           if (style === 'karaoke' && isCur) { ctx.fillStyle = hi; ctx.beginPath(); ctx.roundRect(x - size * 0.12, y - size * 0.88, widths[wi] + size * 0.24, size * 1.12, size * 0.2); ctx.fill(); }
           ctx.save();
-          ctx.translate(x + widths[wi] / 2, y - size * 0.35); ctx.scale(pop, pop); ctx.translate(-(x + widths[wi] / 2), -(y - size * 0.35));
+          ctx.translate(x, y - size * 0.35); ctx.scale(pop, pop); ctx.translate(-x, -(y - size * 0.35)); // pops from its left edge, never into the word before
           const fill = style === 'karaoke' ? (isCur ? '#111111' : color) : style === 'pop' && isCur ? hi : color;
           const stroke = style === 'box' || (style === 'karaoke' && isCur) ? null : '#000000';
           if (style === 'clean') { ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = size * 0.25; }

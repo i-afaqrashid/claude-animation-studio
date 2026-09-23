@@ -7,14 +7,14 @@
   },
   "metadata": {
     "description": "Animated short films made entirely of code — visuals and a synced, synthesized soundtrack.",
-    "version": "0.7.0"
+    "version": "1.0.0"
   },
   "plugins": [
     {
       "name": "animation-studio",
       "source": "./",
       "description": "Make hand-drawn animated short films where every frame is drawn in code and the soundtrack is synthesized in code, perfectly synced from one shared score.",
-      "version": "0.7.0",
+      "version": "1.0.0",
       "author": {
         "name": "Afaq Rashid",
         "url": "https://github.com/i-afaqrashid"

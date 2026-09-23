@@ -69,6 +69,20 @@ A worked app promo (108 BPM, 18 bars, 42s; the user journey IS the story, and ea
 Short-form (Reels/TikTok/Shorts): 15–25s, motion on the very first downbeat, one idea per bar, captions as big numbered steps at the top of the safe area, and an end card that holds ≥ 2s.
 Brand films: use the brand's own colours and font in the UI (a clean system font inside the phone), keep the hand-drawn world around it, only use numbers the client confirms, and keep sacred or sensitive subjects respectful (no comedy, no depictions they would not approve).
 
+### Performance (a band, a qawwali, a dance): `examples/qawwali-night/`
+The music leads and the picture plays it. Everyone's hands are driven by the score's events: claps on the taali, drum hands on the strokes, the keyboard hand on the note's pitch. Every mouth sings its own part.
+| bars | music | picture |
+|---|---|---|
+| 0–1 | a free alaap: drone + a long sung melisma, no rhythm | lights come up slowly, the title, the lead with eyes closed |
+| 2–9 | the rhythm enters; the lead sings a line, the chorus answers it (call and response) | the chorus claps on the taali, the tabla hands strike; a slow push-in |
+| 10–13 | the refrain, faster (a tempo map climbing), a harmonium run between lines | bulbs chase in 8ths, "واہ!" bubbles from the crowd |
+| 13.75 | an 8th of silence (the held breath) | everyone's hands up |
+| 14–17 | the peak: everyone on the refrain, drum rolls | vail (notes thrown), petals, sweeping beams, the crowd's hands up |
+| 18 | the final hit, then silence and applause | a white flash, arms up, the end card over the scene |
+
+### Comic escalation with dialogue: `examples/gully-cricket/`
+The last ball (the set-up, a voiceover sets the stakes) → the hit (an impact frame) → it goes up… and up (drums out, a riser) → SIX! (the drop, a chant) → CRASH (glass + record scratch → silence, a freeze, a snap zoom) → the consequence (aunty, in her own voice) → blame (everyone points) → escape (the groove returns) → the end card. The silence after the crash is what makes it land.
+
 ## Sync gimmicks (the jaw-droppers)
 
 Each one ties visible objects to audible events, both generated from the same score list:

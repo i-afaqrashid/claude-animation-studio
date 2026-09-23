@@ -207,7 +207,8 @@
     const hs = st.hairStyle;
     ctx.save();
     ctx.translate(x, y);
-    if (shadow && pose !== 'sit') {
+    const seated = pose === 'sit' || pose === 'floor';
+    if (shadow && !seated) {
       ctx.fillStyle = 'rgba(20,10,20,0.22)';
       ctx.beginPath(); ctx.ellipse(0, 4, 110 * s, 14 * s, 0, 0, Math.PI * 2); ctx.fill();
     }
@@ -216,13 +217,21 @@
     if (pose === 'walk') ctx.translate(0, -Math.abs(Math.sin(wph)) * 12 * s);
     ctx.scale(s * sx, s * sy);
     ctx.rotate(rot + (pose === 'walk' ? Math.sin(wph) * 0.025 : 0));
-    const hip = pose === 'sit' ? 0 : -150;
+    const hip = seated ? 0 : -150;
     const sh = hip - 172; // shoulder line
     const headC = [headX, sh - 82 + headY];
     const skirtHatch = { color: 'rgba(0,0,0,0.12)', gap: 7 };
 
     // ---- legs ----
-    if (pose === 'sit') {
+    if (pose === 'floor') {
+      // cross-legged on the floor (a qawwali stage, a picnic, a prayer mat): knees out, shins crossed
+      const pants = bottoms === 'pants' || loose || robe;
+      const lc = pants ? legCol : st.skin, lw0 = loose ? 50 : 42;
+      for (const sd of [-1, 1]) G.limb(ctx, [[sd * 34, -12], [sd * 80, 6], [sd * 112, 24]], { color: lc, lw: lw0, seed: seed + 1 + sd });
+      G.limb(ctx, [[-112, 28], [-40, 44], [58, 40]], { color: lc, lw: lw0 - 6, seed: seed + 4 });
+      G.limb(ctx, [[112, 26], [40, 52], [-56, 50]], { color: lc, lw: lw0 - 6, seed: seed + 5 });
+      for (const [fx, fy, sd] of [[80, 36, 1], [-80, 48, -1]]) G.ellipse(ctx, fx, fy, 22, 13, { fill: st.skin, lw: 3.5, seed: seed + 6 + sd });
+    } else if (pose === 'sit') {
       const pants = bottoms === 'pants' || loose;
       for (const sd of [-1, 1]) {
         const lift = sd < 0 ? knee[0] : knee[1];
@@ -257,8 +266,8 @@
     // ---- arms (IK now, drawn last so hands can hold things) ----
     const SL = [-70 * bw, sh + 16], SR = [70 * bw, sh + 16];
     const aw = pose === 'walk' ? Math.cos(wph) : 0; // arms swing against the legs
-    const restL = pose === 'sit' ? [-62, -6] : [-92 - 6 * aw, hip - 30 - 16 * Math.max(0, aw)];
-    const restR = pose === 'sit' ? [62, -6] : [92 - 6 * aw, hip - 30 - 16 * Math.max(0, -aw)];
+    const restL = pose === 'floor' ? [-100, 14] : pose === 'sit' ? [-62, -6] : [-92 - 6 * aw, hip - 30 - 16 * Math.max(0, aw)];
+    const restR = pose === 'floor' ? [100, 14] : pose === 'sit' ? [62, -6] : [92 - 6 * aw, hip - 30 - 16 * Math.max(0, -aw)];
     const gh = Ch.gestureHands(gesture, { sh, hip, t: G.t });
     let pL = handL || gh.L || restL, pR = handR || gh.R || restR;
     if (crossArms) { pL = [48 * bw, sh + 94]; pR = [-50 * bw, sh + 80]; }
@@ -277,18 +286,19 @@
     if (kameez) {
       // sitting: the long shirt drapes over the thighs
       if (pose === 'sit') G.rrect(ctx, -96 * bw, -34, 192 * bw, 84, 30, { fill: st.shirt, lw: 4, seed: seed + 140, hatch: torsoHatch });
+      else if (pose === 'floor') G.rrect(ctx, -104 * bw, -34, 208 * bw, 62, 28, { fill: st.shirt, lw: 4, seed: seed + 140, hatch: torsoHatch });
     }
-    if (robe && pose === 'sit') G.rrect(ctx, -100 * bw, -34, 200 * bw, 88, 30, { fill: robeCol, lw: 4, seed: seed + 140, hatch: torsoHatch });
+    if (robe && seated) G.rrect(ctx, -100 * bw, -34, 200 * bw, 88, 30, { fill: robeCol, lw: 4, seed: seed + 140, hatch: torsoHatch });
     // a sari's long wrapped skirt (the pleats show as lines), under the blouse
-    if (outfit === 'sari' && pose !== 'sit') {
+    if (outfit === 'sari' && !seated) {
       G.poly(ctx, [[-78 * bw, hip - 20], [78 * bw, hip - 20], [96 * bw, -12], [-96 * bw, -12]], { fill: robeCol, lw: 4, seed: seed + 142, step: 22, hatch: skirtHatch });
       for (let k = 0; k < 4; k++) G.line(ctx, [[8 + k * 9, hip + 10], [12 + k * 13, -16]], { lw: 2.5, color: shade(robeCol, 0.72), seed: seed + 143 + k });
       G.line(ctx, [[-96 * bw, -16], [96 * bw, -16]], { lw: 7, color: st.trim === C.teal ? '#E2B33C' : st.trim, seed: seed + 148 });
     }
     // standing in a kameez, the shirt is ONE long piece from shoulders to knees (no waist seam);
     // a thobe or an abaya runs all the way to the ankles
-    const longShirt = kameez && pose !== 'sit';
-    const fullRobe = (outfit === 'thobe' || outfit === 'abaya') && pose !== 'sit';
+    const longShirt = kameez && !seated;
+    const fullRobe = (outfit === 'thobe' || outfit === 'abaya') && !seated;
     const torsoPts = fullRobe
       ? [[-78 * bw, sh], [78 * bw, sh], [82 * bw, hip - 10], [98 * bw, -16], [-98 * bw, -16], [-82 * bw, hip - 10]]
       : longShirt
@@ -309,7 +319,7 @@
     if (outfit === 'sari') {
       // the pallu: over the blouse from the right hip to the left shoulder, with a gold border
       const border = st.trim === C.teal ? '#E2B33C' : st.trim;
-      const pal = pose === 'sit'
+      const pal = seated
         ? [[72 * bw, -20], [40 * bw, -30], [-50 * bw, sh + 6], [-84 * bw, sh + 4], [-88 * bw, sh + 40], [-10, -10]]
         : [[74 * bw, hip + 20], [50 * bw, hip + 30], [-44 * bw, sh + 2], [-84 * bw, sh - 2], [-94 * bw, sh + 60], [-20, hip + 6]];
       G.poly(ctx, pal, { fill: robeCol, lw: 4, seed: seed + 156, step: 16, hatch: skirtHatch });
