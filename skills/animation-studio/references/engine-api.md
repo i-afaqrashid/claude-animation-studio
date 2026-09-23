@@ -15,6 +15,7 @@ All engine files are UMD-style IIFEs: `require()` in Node, globals in the browse
 Return a mono Float32Array unless noted.
 - Drums: `kick({punch, tail, seed})`, `snare({tone, snap, decay})`, `clap({decay, spread})`, `hat(open, seed)`, `crash(seed)`, `tom(freq, decay)`, `shaker(accent)`, `bell(freq, decay, index, ratio)`
 - Tonal: `bass(midi, dur, {bright, sub})`, `padNote(midi, dur, {cutoff, attack, release, detune})` → `{L,R}`, `pluck(midi, {decay, cutoff})` (synth skank), `guitar(midi, dur, {bright, sustain, seed})` (Karplus-Strong plucked string, tuned by an allpass, two body resonances), `epiano(midi, dur, {index, decay})` (FM electric piano), `musicBox(midi, {decay})`, `marimba(midi, {decay, thock})`, `brassNote(midi, dur, {bright, stab, seed})` → `{L,R}`
+- South Asian: `dholak(stroke: 'ghe'|'ka'|'na'|'tit', {pitch, seed})` (two-headed barrel drum; `ghe` bass with a falling pitch), `tabla(stroke: 'na'|'tin'|'ge'|'ka'|'dha', {midi, seed})` (tuned dayan, gliding bayan), `harmonium(midi, dur, {attack, release, detune, bright, seed})` → `{L,R}` (two beating reeds + bellows tremolo), `ting(midi, {gap})` (a generic two-tone message chime)
 - Voice: `voice(midi, dur, {syl: 'o'|'le'|'e'|'a'|'u', type: 'tenor'|'alto', seed, vib, glide, breath, shout})`
 - FX: `noiseSweep(len, f0, f1, {q, shape(x), pink})`, `boing()`, `thud(freq, decay)`, `paperFwip(pitch)`, `tvClick()`, `whistle(len)`, `bwomp()`, `heartbeat()`, `woodTick(pitch)`, `thwack()`, `subBoom(len, f0, f1)`, `pop(pitch)`, `fireworkBurst(seed, size)`, `launchWhistle(len)`, `scribble(len)`
 

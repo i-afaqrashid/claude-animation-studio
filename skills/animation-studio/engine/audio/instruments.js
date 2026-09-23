@@ -220,6 +220,97 @@ function epiano(midi, dur = 0.6, { index = 1.6, decay = 1.1 } = {}) {
   return out;
 }
 
+// ================= SOUTH ASIAN: dholak, tabla, harmonium =================
+// A membrane as a few damped modes: [ratio, amp, decay] at base frequency f (inharmonic = drum-like).
+function modes(out, f, list, { from = 0, gain = 1 } = {}) {
+  for (const [r, a, d] of list) {
+    const w = TAU * f * r / SR;
+    for (let i = from; i < out.length; i++) { const t = (i - from) / SR; out[i] += Math.sin(w * (i - from)) * a * Math.exp(-t / d) * gain * Math.min(1, t / 0.0015); }
+  }
+  return out;
+}
+function clickNoise(out, seed, { hp = 2000, decay = 0.004, gain = 0.3 } = {}) {
+  const w = rng(seed), f = new OnePole();
+  for (let i = 0; i < Math.min(out.length, SR * decay * 8); i++) out[i] += f.hp(w(), hp) * Math.exp(-i / SR / decay) * gain;
+  return out;
+}
+// dholak: the two-headed barrel drum of weddings and folk songs.
+//   'ghe' deep bass head, its pitch falling as the palm presses · 'ka' dry slap on the bass head
+//   'na' ringing treble head · 'tit' sharp treble rim click. pitch scales the whole drum.
+function dholak(stroke = 'ghe', { pitch = 1, seed = 1 } = {}) {
+  if (stroke === 'ghe') {
+    const out = buf(0.6), w = rng(seed), lp = new OnePole();
+    let ph = 0, ph2 = 0;
+    for (let i = 0; i < out.length; i++) {
+      const t = i / SR, f = (70 + 60 * Math.exp(-t / 0.05)) * pitch;
+      ph += f / SR; ph2 += (1.52 * f) / SR;
+      const body = Math.sin(TAU * ph) * Math.exp(-t / 0.24) + 0.28 * Math.sin(TAU * ph2) * Math.exp(-t / 0.07);
+      const slap = lp.lp(w(), 1200) * Math.exp(-t / 0.008) * 0.5;
+      out[i] = Math.tanh((body + slap) * 1.35) * 0.85 * Math.min(1, t / 0.002);
+    }
+    return out;
+  }
+  if (stroke === 'ka') {
+    const out = buf(0.16), w = rng(seed + 3), lp = new OnePole();
+    for (let i = 0; i < out.length; i++) { const t = i / SR; out[i] = (lp.lp(w(), 900) * 1.1 * Math.exp(-t / 0.018) + Math.sin(TAU * 150 * pitch * t) * Math.exp(-t / 0.03) * 0.5) * Math.min(1, t / 0.001); }
+    return out;
+  }
+  const na = stroke !== 'tit', f = (na ? 440 : 820) * pitch;
+  const out = modes(buf(na ? 0.45 : 0.12), f, na ? [[1, 1, 0.16], [1.59, 0.5, 0.09], [2.14, 0.34, 0.06], [2.3, 0.22, 0.05], [2.65, 0.14, 0.035]] : [[1, 1, 0.028], [1.72, 0.5, 0.018], [2.4, 0.3, 0.012]]);
+  clickNoise(out, seed + 7, { hp: 2500, decay: na ? 0.003 : 0.002, gain: na ? 0.35 : 0.5 });
+  for (let i = 0; i < out.length; i++) out[i] *= 0.5;
+  return out;
+}
+// tabla: the tuned right drum (dayan) and the bass left drum (bayan) with its gliding "ge".
+//   'na' bright ringing dayan (harmonic overtones, tuned to midi) · 'tin' softer, longer dayan
+//   'ge' bayan, its pitch gliding up as the palm slides · 'ka' dry bayan slap · 'dha' = na + ge
+function tabla(stroke = 'na', { midi = 62, seed = 1 } = {}) {
+  if (stroke === 'dha') { const a = tabla('na', { midi, seed }), b = tabla('ge', { midi, seed }); const out = buf(Math.max(a.length, b.length) / SR); for (let i = 0; i < out.length; i++) out[i] = (a[i] || 0) * 0.6 + (b[i] || 0) * 0.55; return out; }
+  if (stroke === 'ge') {
+    const out = buf(0.7);
+    let ph = 0;
+    for (let i = 0; i < out.length; i++) {
+      const t = i / SR, f = 88 + 42 * (1 - Math.exp(-t / 0.07)); // the upward "wah"
+      ph += f / SR;
+      out[i] = (Math.sin(TAU * ph) + 0.18 * Math.sin(TAU * 2 * ph)) * Math.exp(-t / 0.3) * Math.min(1, t / 0.002) * 0.75;
+    }
+    return clickNoise(out, seed + 11, { hp: 700, decay: 0.004, gain: 0.25 });
+  }
+  if (stroke === 'ka') return dholak('ka', { pitch: 0.85, seed: seed + 5 });
+  const f = mtof(midi), tin = stroke === 'tin';
+  const out = modes(buf(tin ? 0.8 : 0.5), f, tin ? [[1, 1, 0.45], [2, 0.3, 0.2], [3, 0.18, 0.12], [4, 0.08, 0.08]] : [[1, 1, 0.3], [2, 0.62, 0.2], [3, 0.46, 0.14], [4, 0.3, 0.09], [5, 0.16, 0.06], [2.95, 0.12, 0.02]]);
+  clickNoise(out, seed + 13, { hp: 3000, decay: 0.0025, gain: tin ? 0.2 : 0.4 });
+  for (let i = 0; i < out.length; i++) out[i] *= 0.45;
+  return out;
+}
+// harmonium: a hand-pumped reed organ. Two slightly detuned reeds per note beat against each other,
+// the bellows swell in and breathe (a slow tremolo), and a nasal formant gives the reedy colour. → {L, R}
+function harmonium(midi, dur = 1, { attack = 0.07, release = 0.2, detune = 4, bright = 1, seed = 1 } = {}) {
+  const f = mtof(midi), c = Math.pow(2, detune / 1200);
+  const len = dur + release + 0.05, L = buf(len), R = buf(len);
+  const a = new Square(rng(seed)() * 0.5 + 0.5, 0.28), b = new Square(0.13, 0.3);
+  const fl = new SVF(), fr = new SVF(), nl = new SVF(), nr = new SVF();
+  for (let i = 0; i < L.length; i++) {
+    const t = i / SR;
+    const env = (t < attack ? t / attack : 1) * (t > dur ? Math.max(0, 1 - (t - dur) / release) : 1) * (1 + 0.05 * Math.sin(TAU * 5.2 * t));
+    const x = a.next(f * c), y = b.next(f / c);
+    const sl = x * 0.6 + y * 0.45, sr = x * 0.45 + y * 0.6;
+    const lo = 900 + 2600 * bright;
+    L[i] = (fl.lp(sl, lo, 0.7) * 0.8 + nl.bp(sl, 1250, 2.2) * 0.35) * env * 0.35;
+    R[i] = (fr.lp(sr, lo, 0.7) * 0.8 + nr.bp(sr, 1250, 2.2) * 0.35) * env * 0.35;
+  }
+  return { L, R };
+}
+// a message notification "ting": two quick bell tones, the second a fourth above (a generic chime)
+function ting(midi = 88, { gap = 0.075, seed = 1 } = {}) {
+  const out = buf(0.9);
+  for (const [k, dm] of [[0, 0], [1, 5]]) {
+    const f = mtof(midi + dm), from = Math.round(k * gap * SR);
+    modes(out, f, [[1, 0.55, 0.22], [2.76, 0.18, 0.05], [5.4, 0.08, 0.02]], { from });
+  }
+  return out;
+}
+
 // ================= MALLETS =================
 function musicBox(midi, { decay = 1.4, seed = 12 } = {}) {
   const f = mtof(midi);
@@ -589,6 +680,7 @@ function scribble(len, seed = 31) {
 
 module.exports = {
   kick, snare, clap, hat, crash, tom, shaker, bell, bass, padNote, pluck, guitar, epiano, musicBox, marimba, brassNote, voice,
+  dholak, tabla, harmonium, ting,
   noiseSweep, boing, thud, paperFwip, tvClick, whistle, bwomp, heartbeat, woodTick, thwack, subBoom, pop,
   fireworkBurst, launchWhistle, scribble, buf,
 };

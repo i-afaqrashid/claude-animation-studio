@@ -1,7 +1,7 @@
 ---
 name: animation-studio
 description: This skill should be used when the user asks to "make an animated video about X with music", "make a cartoon / animated short", "animate this story", "make a video like the Opus animations", "make an explainer animation", "make a promo video for my app / brand", or "make an animated Reel / TikTok / Short" — a new hand-drawn 2D film where every frame is drawn in code and the soundtrack is synthesized in code, synced from one score, delivered as a 1080p MP4 in 16:9, 9:16, 1:1 or 4:5. Not for CSS/web/UI animation, Lottie/SVG/GIF assets, editing or adding music to an existing video, or Remotion/Manim projects.
-version: 0.5.0
+version: 0.5.1
 ---
 
 # Animation Studio
@@ -144,6 +144,7 @@ Report the output path, duration, resolution and size. Explain the sync gimmicks
 
 ### Scripts
 - **`scripts/new-project.js`**: scaffold a project (engine + template or example; `--format 9:16|1:1|4:5`, `--from app-promo`) with a preflight check
+- **`scripts/test-audio.js`**: fast audio regression test (every instrument renders, tuned ones are in tune, the loudness meter is exact); run after touching engine/audio
 - **`scripts/smoke-test.js`**: end-to-end engine check (true-peak limiter, render, mux, markers, board, clip, verify, a crashing ffmpeg, two renders in one folder); run it after changing the engine
 - **`engine/render.js`**: `stills | sheet | board | clip [--gif] | preview | cast | video | mux | check | verify`; times as seconds, `bar:beat` or `@marker±sec`
 - **`engine/tools/levels.js`**: per-section RMS/peak meter for the mix and stems

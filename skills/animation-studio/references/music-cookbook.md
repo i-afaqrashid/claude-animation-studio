@@ -26,6 +26,15 @@ Everything is rendered offline at 48 kHz into `Bus` objects (stereo Float32Array
 | voice | `I.voice(midi, dur, {syl, type, glide, vib, breath, shout})` | formant singer: `syl` o / le / e / a / u, `type` tenor / alto |
 | fx | `boing, thud, paperFwip, tvClick, whistle, bwomp, heartbeat, woodTick, thwack, subBoom, pop, fireworkBurst, launchWhistle, scribble, noiseSweep` | each tied to a score event |
 
+### Desi / South Asian (dholak, tabla, harmonium, taali)
+The Sitey promo recipe (104 BPM, D major pentatonic):
+- **Dholak groove** in 16 steps: `ghe` on 0 and 8 (0.7), `gheLo` (pitch 0.9) on 6 and 11 (0.5), `na` on 2, 10, 14 (0.4), `na2` (pitch 1.06) on 4, 12, `ka` on 7 and 15 (0.3), a ghost `tit` on 13. Pan the `na` strokes a little right.
+- **Taali** (hand claps) on beats 2 and 4: `I.clap({ spread: 1.3 })`, plus a touch of reverb. A light kick on 1 and 3 only in the payoff.
+- **Harmonium** plays the chords (gain ≈ 0.08 per note, attack 0.08, `bright` 0.8) and doubles the hook an octave down (attack 0.02, `bright` 1.2). That doubling is what makes it sound desi.
+- **Tabla**: `tin` on every beat for a soft section; a `na`/`tin` roll of 8 notes in 32nds into a big moment, then `dha` on the downbeat.
+- **Notifications**: `I.ting(midi)` pitched up the pentatonic scale, faster and faster, makes a comic "flood" of messages.
+Checked by measurement: the tabla `na` lands within 2 Hz of its note, the harmonium within ±5 cents, and the dholak `ghe` falls from ~130 to ~70 Hz.
+
 ### Crowd and choir (formant synthesis)
 - **Chant ("o-lé")**: for each hook note, 12 tenors (an octave down) + 7 altos (at pitch), each with a random detune of ±0.17 semitones, 0–35ms lag, random pan, and syllables alternating `o` / `le`. Gain about 0.05 each, plus its own large reverb.
 - **Crowd babble**: Poisson-spawn shouts (0.35–1.35s, random vowel, pitch 47–60 or +12 for altos, glide ±, breath 0.18, shout 1.3). Use about 7/s during a match, a rising 4 → 26/s during a build, and a burst of about 55 long rising "yeaaah" voices on the goal.
