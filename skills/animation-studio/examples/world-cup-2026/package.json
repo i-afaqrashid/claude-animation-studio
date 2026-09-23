@@ -1,0 +1,14 @@
+{
+  "name": "world-cup-2026",
+  "private": true,
+  "description": "Claude × Afaq — World Cup 2026. 58s, every frame and every sound made of code.",
+  "scripts": {
+    "music": "node song.js",
+    "stems": "STEMS=1 node song.js && node engine/tools/levels.js out/music.wav out/stem-*.wav",
+    "sheet": "node engine/render.js sheet",
+    "video": "node engine/render.js video",
+    "mux": "node engine/render.js mux",
+    "check": "node engine/render.js check",
+    "build": "node song.js && node engine/render.js video && node engine/render.js mux && node engine/render.js check"
+  }
+}

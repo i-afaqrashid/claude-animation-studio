@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Claude × Afaq — World Cup 2026</title>
+<style>
+  @font-face { font-family: 'Caveat'; src: url('engine/fonts/Caveat-Bold.ttf'); font-weight: 700; }
+  @font-face { font-family: 'Bungee'; src: url('engine/fonts/Bungee-Regular.ttf'); }
+  @font-face { font-family: 'Permanent Marker'; src: url('engine/fonts/PermanentMarker-Regular.ttf'); }
+  @font-face { font-family: 'Patrick Hand'; src: url('engine/fonts/PatrickHand-Regular.ttf'); }
+  @font-face { font-family: 'Gochi Hand'; src: url('engine/fonts/GochiHand-Regular.ttf'); }
+  html, body { margin: 0; background: #111; }
+  canvas { display: block; width: 100vw; height: auto; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script src="engine/util.js"></script>
+<script src="score.js"></script>
+<script src="engine/video/gfx.js"></script>
+<script src="engine/video/chars.js"></script>
+<!-- film-specific scenes; main.js defines its own renderAt (captions + paper wipes + post) -->
+<script src="film/room.js"></script>
+<script src="film/pitch.js"></script>
+<script src="film/main.js"></script>
+</body>
+</html>

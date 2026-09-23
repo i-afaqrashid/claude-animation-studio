@@ -1,0 +1,27 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "claude-animation-studio",
+  "owner": {
+    "name": "Afaq Rashid",
+    "url": "https://github.com/i-afaqrashid"
+  },
+  "metadata": {
+    "description": "Animated short films made entirely of code — visuals and a synced, synthesized soundtrack.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "animation-studio",
+      "source": "./",
+      "description": "Make hand-drawn animated short films where every frame is drawn in code and the soundtrack is synthesized in code, perfectly synced from one shared score.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Afaq Rashid",
+        "url": "https://github.com/i-afaqrashid"
+      },
+      "license": "MIT",
+      "category": "creative",
+      "tags": ["animation", "video", "music", "skills"]
+    }
+  ]
+}
