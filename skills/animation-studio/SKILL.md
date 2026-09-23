@@ -1,7 +1,7 @@
 ---
 name: animation-studio
 description: This skill should be used when the user asks to "make an animated video about X with music", "make a cartoon / animated short", "animate this story", "make a video like the Opus animations", "make an explainer animation", "make a promo video for my app / brand", or "make an animated Reel / TikTok / Short" — a new hand-drawn 2D film where every frame is drawn in code and the soundtrack is synthesized in code, synced from one score, delivered as a 1080p MP4 in 16:9, 9:16, 1:1 or 4:5. Not for CSS/web/UI animation, Lottie/SVG/GIF assets, editing or adding music to an existing video, or Remotion/Manim projects.
-version: 0.5.1
+version: 0.6.0
 ---
 
 # Animation Studio
@@ -52,6 +52,8 @@ The silence-and-drop is a tool, not a signature: use it only when the story has 
 
 Keep facts honest. If the film references real events whose details are unknown (a match result, a date), keep them fictional or generic.
 
+For a brand, product or business, run `node engine/render.js brand-from https://their-site` right after scaffolding: it writes `brand.json` (colours, fonts, logo, CTA) that every film picks up. Add the claims it must never make.
+
 ### 2. Scaffold the project
 
 ```bash
@@ -98,7 +100,7 @@ Read the PNGs and critique every shot: legibility, faces hidden by props, colour
 
 **Let the user watch and listen before the full render.** Run `node engine/render.js preview` with `run_in_background: true` and give the user the printed `http://127.0.0.1:<port>/__preview` link. It plays the music and draws the film live, with a timeline of sections and markers (space play, ←/→ beat, [ ] marker, L loop section). You can't watch it yourself (`preview --check` only tests that it loads). The port is OS-assigned, never a fixed one like 3000. When they're done, stop that background task, and only that one.
 
-Before the full render, run `node engine/render.js board` (every marker as one labelled storyboard, `out/board.png`), give the user its path, the preview link and the music measurements, and let them approve or redirect. The full render costs minutes; a change of mind after it costs a second render.
+Run `node engine/render.js plan` (a one-page treatment: bar map, every on-screen word as a claims checklist, cast), `qa` (text outside the safe area, too small, overlapping, low contrast) and, on a `--draft` render, `pacing` (the first-3-seconds hook and the cuts). Fix what they flag. Before the full render, run `node engine/render.js board` (every marker as one labelled storyboard, `out/board.png`), give the user its path, the preview link and the music measurements, and let them approve or redirect. The full render costs minutes; a change of mind after it costs a second render.
 
 ### 7. Render, mux, verify
 
@@ -110,7 +112,7 @@ cd <target-dir> && node engine/render.js check      # -> out/check-sheet.png + l
 cd <target-dir> && node engine/render.js verify     # sound + picture measured at every sync marker (exit 1 if off)
 ```
 
-`video` verifies the encoded frame count and `mux` verifies the final file has picture + sound at the right duration; any ffmpeg failure stops the run with an error. `render.js video` runs for minutes (about 7 min for 58s on 8 cores), longer than the Bash tool's default 2-minute timeout. Launch it with `run_in_background: true`, check its `frames … eta` output, and wait for `out/video.mp4 done` before running `mux`. For sharing, `clip @drop-2 @drop+2 --gif` also writes a GIF (480px on the short side, 12fps). After the final file exists, cut 10fps strips around fast moments: `ffmpeg -ss <t> -t 1.2 -i out/<name>.mp4 -vf "fps=10,scale=480:-1,tile=4x3" -frames:v 1 out/strip.png`. `verify` decodes the final MP4 and, for each `sync` marker, finds the steepest rise in the sound (must be within ±20 ms) and the biggest change in the picture (must be the first frame at or after the marker, ±1 frame). A ✗ means one side is late: fix it in `score.js`, never by nudging one side by hand. A `?` means nothing distinct happens there; make the moment a clear hit or drop its `sync` flag.
+`video` verifies the encoded frame count and `mux` verifies the final file has picture + sound at the right duration; any ffmpeg failure stops the run with an error. `render.js video` runs for minutes (about 7 min for 58s on 8 cores), longer than the Bash tool's default 2-minute timeout. Launch it with `run_in_background: true`, check its `frames … eta` output, and wait for `out/video.mp4 done` before running `mux`. For publishing: `srt` (subtitle files), `poster` (three 1280×720 thumbnails + a vertical cover), `formats 16:9,9:16` (every format from one score) and `mux --subs`. For sharing, `clip @drop-2 @drop+2 --gif` also writes a GIF (480px on the short side, 12fps). After the final file exists, cut 10fps strips around fast moments: `ffmpeg -ss <t> -t 1.2 -i out/<name>.mp4 -vf "fps=10,scale=480:-1,tile=4x3" -frames:v 1 out/strip.png`. `verify` decodes the final MP4 and, for each `sync` marker, finds the steepest rise in the sound (must be within ±20 ms) and the biggest change in the picture (must be the first frame at or after the marker, ±1 frame). A ✗ means one side is late: fix it in `score.js`, never by nudging one side by hand. A `?` means nothing distinct happens there; make the moment a clear hit or drop its `sync` flag.
 
 ### 8. Deliver
 
@@ -133,6 +135,7 @@ Report the output path, duration, resolution and size. Explain the sync gimmicks
 - **`references/music-cookbook.md`**: instrument recipes, arrangement per section, mix/loudness targets, crowd and choir synthesis
 - **`references/visual-style.md`**: palette, boil, hatching, lighting with multiply gradients, camera, transitions, character acting
 - **`references/custom-characters.md`**: presets, every `Ch.person` style option, building new characters, using real images
+- **`references/reach-and-workflow.md`**: captions/subtitles, pacing, thumbnails, formats, drafts, brand kit, plan, visual QA, live preview, shots and transitions, multilingual text
 - **`references/engine-api.md`**: every function in the engine with parameters
 - **`references/review-and-gotchas.md`**: review commands, sync verification, known pitfalls and fixes
 
@@ -146,5 +149,5 @@ Report the output path, duration, resolution and size. Explain the sync gimmicks
 - **`scripts/new-project.js`**: scaffold a project (engine + template or example; `--format 9:16|1:1|4:5`, `--from app-promo`) with a preflight check
 - **`scripts/test-audio.js`**: fast audio regression test (every instrument renders, tuned ones are in tune, the loudness meter is exact); run after touching engine/audio
 - **`scripts/smoke-test.js`**: end-to-end engine check (true-peak limiter, render, mux, markers, board, clip, verify, a crashing ffmpeg, two renders in one folder); run it after changing the engine
-- **`engine/render.js`**: `stills | sheet | board | clip [--gif] | preview | cast | video | mux | check | verify`; times as seconds, `bar:beat` or `@marker±sec`
+- **`engine/render.js`**: `stills | sheet | board | clip [--gif] | preview | cast | video | mux [--subs] | check | verify | pacing | qa | plan | poster | srt | formats | brand | brand-from <url>`, plus `--draft` and `--format 9:16`; times as seconds, `bar:beat` or `@marker±sec`
 - **`engine/tools/levels.js`**: per-section RMS/peak meter for the mix and stems

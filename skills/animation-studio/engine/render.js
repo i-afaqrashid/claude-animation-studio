@@ -21,6 +21,14 @@ const http = require('http');
 
 const ROOT = process.cwd();
 const OUT = path.join(ROOT, 'out');
+// global flags (before score.js loads, because --format changes its layout)
+const RAW_ARGS = process.argv.slice(2);
+const flagVal = (name) => { const i = RAW_ARGS.indexOf(name); return i >= 0 ? RAW_ARGS[i + 1] : null; };
+if (flagVal('--format')) process.env.ANIM_FORMAT = flagVal('--format');
+const DRAFT = RAW_ARGS.includes('--draft'); // half-resolution frames: 2-4x faster, for iterating
+const SCALE = DRAFT ? 0.5 : 1;
+// output names carry the format override and the draft flag: out/video-9x16-draft.mp4, out/<name>-9x16.mp4
+const SUFFIX = (process.env.ANIM_FORMAT ? '-' + process.env.ANIM_FORMAT.replace(':', 'x') : '') + (DRAFT ? '-draft' : '');
 const SCORE = require(path.join(ROOT, 'score.js'));
 const { FPS, DURATION } = SCORE;
 if (!FPS || !DURATION) throw new Error('score.js must export FPS and DURATION');
@@ -71,6 +79,17 @@ function lintDeterminism() {
     fs.readFileSync(fp, 'utf8').split('\n').forEach((line, i) => { if (bad.test(line.replace(/\/\/.*$/, ''))) hits.push(`${f}:${i + 1}: ${line.trim().slice(0, 90)}`); });
   }
   if (hits.length) console.warn(`warning: frames must be a pure function of t. Use U.hash / U.mulberry32(seed) and t instead of:\n  ${hits.join('\n  ')}`);
+  // brand.json claims.forbidden: phrases the film must never say (e.g. "#1 on Google", "guaranteed")
+  let brand = null;
+  try { brand = JSON.parse(fs.readFileSync(path.join(ROOT, 'brand.json'), 'utf8')); } catch (e) { /* no brand kit */ }
+  const forbidden = (brand && brand.claims && brand.claims.forbidden) || [];
+  const found = [];
+  for (const f of files) {
+    const fp = path.join(ROOT, f);
+    if (!fs.existsSync(fp)) continue;
+    fs.readFileSync(fp, 'utf8').split('\n').forEach((line, i) => { for (const ph of forbidden) if (line.toLowerCase().includes(String(ph).toLowerCase())) found.push(`${f}:${i + 1}: "${ph}"`); });
+  }
+  if (found.length) console.warn(`warning: brand.json forbids these claims, and the film says them:\n  ${found.join('\n  ')}`);
 }
 const sectionAt = (t) => (SCORE.S ? (Object.entries(SCORE.S).find(([, [a, b]]) => t >= a && t < b) || [''])[0] : '');
 
@@ -103,9 +122,11 @@ function resolveSafe(url) {
   if (!inside(real) || fs.statSync(real).isDirectory()) return null;
   return real;
 }
+const HOOKS = []; // extra routes (the live preview adds /__events and /__clip)
 function serve() {
   return new Promise((resolve) => {
     const srv = http.createServer((req, res) => {
+      for (const h of HOOKS) if (h(req, res)) return;
       if ((req.method === 'GET' || req.method === 'HEAD') && req.url.split(/[?#]/)[0] === '/__preview') {
         // the film's own page + the preview player (the page itself is never written to disk)
         const html = fs.readFileSync(path.join(ROOT_REAL, 'index.html'), 'utf8').replace('</body>', '<script src="engine/video/player.js"></script>\n</body>');
@@ -178,7 +199,7 @@ function cdp(wsUrl, tag) {
         console.error(`[${tag}] EXCEPTION`, d.exception ? d.exception.description : d.text);
       } else if (msg.method === 'Log.entryAdded') {
         const e = msg.params.entry;
-        if (!/favicon/.test(e.url || '')) console.log(`[${tag}] LOG`, e.level, e.text, e.url || '');
+        if (!/favicon|\/brand\.json|\/out\/(voice|analysis|lyrics)\.json/.test(e.url || '') && !/willReadFrequently/.test(e.text || '')) console.log(`[${tag}] LOG`, e.level, e.text, e.url || ''); // optional files may be missing; Chrome's readback hint is noise
       } else if (msg.method === 'Runtime.consoleAPICalled') {
         console.log(`[${tag}]`, msg.params.args.map((a) => a.value ?? a.description).join(' '));
       }
@@ -197,10 +218,10 @@ async function evaluate(c, expr) {
   return r.result.value;
 }
 
-async function openWorker(tag, url = PAGE) {
+async function openWorker(tag, url = PAGE, opts = {}) {
   const { proc, ws, dir } = await launch();
   try {
-    return await attach(proc, ws, dir, tag, url);
+    return await attach(proc, ws, dir, tag, url, opts);
   } catch (e) {
     killChrome(proc);
     launched.delete(proc);
@@ -208,17 +229,27 @@ async function openWorker(tag, url = PAGE) {
   }
 }
 
-async function attach(proc, ws, dir, tag, url) {
+const pageQuery = () => `v=${Date.now()}${process.env.ANIM_FORMAT ? '&format=' + encodeURIComponent(process.env.ANIM_FORMAT) : ''}`;
+// external: true opens any web page (website snapshots, brand extraction) and waits for it to load
+async function attach(proc, ws, dir, tag, url, { external = false, device = null } = {}) {
   const c = await cdp(ws, tag);
   await c.send('Runtime.enable');
   await c.send('Page.enable');
   await c.send('Log.enable');
-  await c.send('Page.navigate', { url: url + (url.includes('#') ? '' : '?v=' + Date.now()) });
-  for (let i = 0; i < 300; i++) {
-    try { if (await evaluate(c, 'window.READY === true')) break; } catch (e) { /* loading */ }
-    await sleep(50);
+  if (device) await c.send('Emulation.setDeviceMetricsOverride', device);
+  if (external) {
+    await c.send('Page.navigate', { url });
+    for (let i = 0; i < 300; i++) { try { if (await evaluate(c, 'document.readyState') === 'complete') break; } catch (e) { /* loading */ } await sleep(100); }
+    await sleep(1200); // late fonts, images, animations
+  } else {
+    const [base, hash] = url.split('#');
+    await c.send('Page.navigate', { url: `${base}${base.includes('?') ? '&' : '?'}${pageQuery()}${hash ? '#' + hash : ''}` });
+    for (let i = 0; i < 300; i++) {
+      try { if (await evaluate(c, 'window.READY === true')) break; } catch (e) { /* loading */ }
+      await sleep(50);
+    }
+    if (!(await evaluate(c, 'window.READY === true'))) throw new Error('page never set window.READY — check the console errors above');
   }
-  if (!(await evaluate(c, 'window.READY === true'))) throw new Error('page never set window.READY — check the console errors above');
   return {
     c,
     close() {
@@ -231,8 +262,8 @@ async function attach(proc, ws, dir, tag, url) {
   };
 }
 
-async function grab(w, t, fmt = 'png') {
-  const url = await evaluate(w.c, `window.renderAt(${t}, '${fmt}')`);
+async function grab(w, t, fmt = 'png', scale = SCALE) {
+  const url = await evaluate(w.c, `window.renderAt(${t}, '${fmt}', ${scale})`);
   return Buffer.from(url.slice(url.indexOf(',') + 1), 'base64');
 }
 
@@ -259,7 +290,8 @@ function countFrames(file) {
   const out = execFileSync(FFPROBE, ['-v', 'error', '-select_streams', 'v:0', '-count_packets', '-show_entries', 'stream=nb_read_packets', '-of', 'csv=p=0', file]).toString().trim();
   return parseInt(out, 10);
 }
-const finalName = (arg) => path.join(OUT, `${arg || path.basename(ROOT)}.mp4`);
+const finalName = (arg) => path.join(OUT, `${arg || path.basename(ROOT)}${SUFFIX}.mp4`);
+const VIDEO = path.join(OUT, `video${SUFFIX}.mp4`);
 
 // Render frames [f0, f1) with parallel Chrome workers into ONE verified H.264 file.
 // Each worker pipes its frames to its own ffmpeg (a segment); segments are joined losslessly.
@@ -460,20 +492,36 @@ function verify(file) {
   return bad === 0;
 }
 
+// modes that live in engine/tools/<file>.js (each gets the context object below)
+const TOOLS = { brand: 'brand', 'brand-from': 'brand', poster: 'poster', formats: 'formats', pacing: 'pacing', qa: 'qa', plan: 'plan', snap: 'snap', srt: 'srt' };
 async function main() {
-  const [mode, ...args] = process.argv.slice(2);
+  const [mode, ...rest] = RAW_ARGS;
+  const args = [];
+  for (let i = 0; i < rest.length; i++) { if (rest[i] === '--draft') continue; if (rest[i] === '--format') { i++; continue; } args.push(rest[i]); }
+  if (TOOLS[mode]) {
+    const CTX = { ROOT, OUT, SCORE, FPS, DURATION, FW, FH, PORTRAIT, MARKERS, DRAFT, SCALE, SUFFIX, VIDEO, FFMPEG, FFPROBE, CHROME,
+      parseTime, markerTime, barBeat, sectionAt, serve, openWorker, evaluate, grab, sleep, renderRange, countFrames, finalName, acquireLock, lintDeterminism, thumb,
+      page: () => PAGE, fs, path, os, execFileSync, spawn };
+    await require(`./tools/${TOOLS[mode]}.js`)(CTX, mode, args);
+    return;
+  }
   if (mode === 'mux' || mode === 'video') acquireLock();
   if (mode === 'mux' || mode === 'check' || mode === 'verify') {
-    let file = finalName(args[0]);
+    const nameArg = args.find((a) => !a.startsWith('--'));
+    let file = finalName(nameArg);
     if (mode === 'verify') {
-      if (!fs.existsSync(file) && !args[0]) file = path.join(OUT, 'video.mp4');
+      if (!fs.existsSync(file) && !nameArg) file = VIDEO;
       if (!fs.existsSync(file)) throw new Error(`${file} not found: render (and mux) first`);
       if (!verify(file)) process.exitCode = 1;
       return;
     }
     if (mode === 'mux') {
-      execFileSync(FFMPEG, ['-v', 'error', '-y', '-i', path.join(OUT, 'video.mp4'), '-i', path.join(OUT, 'music.wav'), '-map', '0:v', '-map', '1:a',
+      // --subs: a soft subtitle track from out/<name>.srt (render.js srt), switchable in players
+      const srtFile = path.join(OUT, `${nameArg || path.basename(ROOT)}.srt`);
+      const subs = args.includes('--subs') && fs.existsSync(srtFile) ? ['-i', srtFile] : [];
+      execFileSync(FFMPEG, ['-v', 'error', '-y', '-i', VIDEO, '-i', path.join(OUT, 'music.wav'), ...subs, '-map', '0:v', '-map', '1:a', ...(subs.length ? ['-map', '2:s', '-c:s', 'mov_text'] : []),
         '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', '-c:a', 'aac', '-b:a', '256k', '-shortest', file], { stdio: 'inherit' });
+      if (args.includes('--subs') && !subs.length) console.log('(no out/*.srt yet: run node engine/render.js srt first)');
       const info = JSON.parse(execFileSync(FFPROBE, ['-v', 'error', '-show_entries', 'format=duration:stream=codec_type', '-of', 'json', file]).toString());
       const types = info.streams.map((x) => x.codec_type);
       const dur = parseFloat(info.format.duration);
@@ -491,7 +539,7 @@ async function main() {
     return;
   }
   if (!['stills', 'sheet', 'board', 'clip', 'video', 'preview', 'cast'].includes(mode)) {
-    console.log('usage: node engine/render.js stills|sheet|board|clip|video|mux|check|verify|preview|cast ...');
+    console.log(`usage: node engine/render.js <mode> ... [--draft] [--format 9:16]\nmodes: stills sheet board clip video mux check verify preview cast ${Object.keys(TOOLS).join(' ')}`);
     return;
   }
   const times = mode === 'stills' || mode === 'board' ? args.map(parseTime) : null; // fail on a bad time BEFORE launching Chrome
@@ -559,7 +607,55 @@ async function main() {
       if (st.film !== true) throw new Error('the film never became ready in the preview');
       return;
     }
-    console.log(`\npreview with sound → ${url}\n\nOpen it in Chrome and click Play. Keys: space play/pause · ←/→ beat · shift+←/→ bar · [ ] marker · L loop section.\nAfter editing score.js / film.js: reload the page. After editing song.js: node song.js, then reload.\nCtrl+C stops the preview server.`);
+    // live reload: watch the project; score.js / song.js changes re-render the music first
+    const clients = new Set();
+    const send = (ev, data = '') => { for (const c of clients) c.write(`event: ${ev}\ndata: ${data}\n\n`); };
+    const runNode = (argv) => new Promise((resolve) => { const p = spawn(process.execPath, argv, { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }); let log = ''; p.stdout.on('data', (d) => (log += d)); p.stderr.on('data', (d) => (log += d)); p.on('close', (code) => resolve({ code, log })); });
+    HOOKS.push((req, res) => {
+      const u = req.url.split('?')[0];
+      if (u === '/__events') {
+        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
+        res.write('retry: 1000\n\n'); clients.add(res); req.on('close', () => clients.delete(res));
+        return true;
+      }
+      if (u === '/__clip' && req.method === 'POST') {
+        let body = '';
+        req.on('data', (d) => (body += d));
+        req.on('end', async () => {
+          try {
+            const { from, to } = JSON.parse(body);
+            const r = await runNode([path.join(ROOT, 'engine', 'render.js'), 'clip', String(+from), String(+to)]);
+            const m = /out\/(clip_[^ ]+\.mp4)/.exec(r.log);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(r.code === 0 && m ? { ok: true, file: 'out/' + m[1] } : { ok: false, error: r.log.slice(-300) }));
+          } catch (e) { res.writeHead(400); res.end(JSON.stringify({ ok: false, error: String(e) })); }
+        });
+        return true;
+      }
+      return false;
+    });
+    let timer = null, musicDirty = false, busy = false;
+    const rebuild = async () => {
+      if (busy) { timer = setTimeout(rebuild, 300); return; }
+      busy = true;
+      if (musicDirty && fs.existsSync(path.join(ROOT, 'song.js'))) {
+        musicDirty = false; send('status', 'rendering music…');
+        const r = await runNode(['song.js']);
+        send('status', r.code === 0 ? '' : 'song.js failed: ' + r.log.split('\n').filter(Boolean).pop());
+        console.log(r.code === 0 ? '♪ music re-rendered' : `song.js failed:\n${r.log.slice(-400)}`);
+      }
+      busy = false;
+      send('reload');
+      console.log('↻ reloaded');
+    };
+    try {
+      fs.watch(ROOT, { recursive: true }, (_ev, file) => {
+        if (!file || /^(out|\.git|node_modules)([\\/]|$)|\.(tmp|swp)$|~$/.test(file)) return;
+        if (/(^|[\\/])(song|score)\.js$/.test(file)) musicDirty = true;
+        clearTimeout(timer); timer = setTimeout(rebuild, 250);
+      });
+    } catch (e) { console.log('(live reload unavailable here: reload the page by hand)'); }
+    console.log(`\npreview with sound → ${url}\n\nOpen it in Chrome and click Play. Keys: space play/pause · ←/→ beat · shift+←/→ bar · [ ] marker · L loop section.\nLive reload is on: save score.js / film.js and the page reloads at the same moment; save song.js and the music re-renders first.\n"⤓ clip" renders the loop (or the current section) with sound. Ctrl+C stops the preview server.`);
     await new Promise(() => {}); // serve until interrupted
   } else if (mode === 'cast') {
     const w = await openWorker('w0');
@@ -576,7 +672,7 @@ async function main() {
     if (!(b > a)) throw new Error(`clip range is empty: ${a.toFixed(2)}s → ${b.toFixed(2)}s`);
     const f0 = Math.ceil(a * FPS - 1e-6), f1 = Math.ceil(b * FPS - 1e-6);
     const workers = parseInt(cargs[2] || String(Math.max(2, os.cpus().length - 1)), 10);
-    const name = `clip_${(f0 / FPS).toFixed(2)}-${(f1 / FPS).toFixed(2)}.mp4`;
+    const name = `clip_${(f0 / FPS).toFixed(2)}-${(f1 / FPS).toFixed(2)}${SUFFIX}.mp4`;
     const silent = path.join(OUT, `.clip-${process.pid}.mp4`);
     process.on('exit', () => fs.rmSync(silent, { force: true }));
     const { frames, secs } = await renderRange(f0, f1, workers, silent, { fmt: 'jpeg', crf: 20, preset: 'veryfast' });
@@ -599,8 +695,8 @@ async function main() {
     }
   } else if (mode === 'video') {
     const workers = parseInt(args[0] || String(Math.max(2, os.cpus().length - 1)), 10);
-    const { frames, secs } = await renderRange(0, Math.round(DURATION * FPS), workers, path.join(OUT, 'video.mp4'));
-    console.log(`out/video.mp4 done in ${secs.toFixed(1)}s (${frames} frames verified)`);
+    const { frames, secs } = await renderRange(0, Math.round(DURATION * FPS), workers, VIDEO);
+    console.log(`out/${path.basename(VIDEO)} done in ${secs.toFixed(1)}s (${frames} frames verified${DRAFT ? ', draft: half resolution' : ''})`);
   }
 }
 main().then(() => process.stdout.write('', () => process.exit(process.exitCode || 0))).catch((e) => { console.error(e); process.exit(1); });

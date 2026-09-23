@@ -265,26 +265,118 @@
     ctx.restore();
   };
 
-  // ---------- text ----------
-  G.font = (size, fam = 'Caveat', weight = 700) => `${weight} ${size}px "${fam}"`;
-  G.text = (ctx, str, x, y, { size = 48, fam = 'Caveat', weight = 700, color = G.C.ink, align = 'left', baseline = 'alphabetic', boil = 0.8, alpha = 1, stroke, strokeW = 8 } = {}) => {
+  // ---------- text (any script) ----------
+  // A string is split into runs by script, and each run gets a font that has its letters:
+  // Nastaliq for Urdu, Naskh for Arabic, Noto Sans Devanagari for Hindi (bundled in engine/fonts),
+  // the requested font for everything else. Right-to-left runs are drawn with direction 'rtl' and
+  // the runs are laid out in reading order, so "Order on WhatsApp · آرڈر کریں" just works.
+  G.SCRIPT_FONTS = { urdu: 'Noto Nastaliq Urdu', arabic: 'Noto Naskh Arabic', devanagari: 'Noto Sans Devanagari' };
+  G.SCRIPT_SCALE = { urdu: 0.9, arabic: 1, devanagari: 0.92 }; // match the Latin x-height
+  const NEUTRAL = /[\s\d.,:;!?'"()[\]\-–—·•…/%+&@#*=<>|_~^$€£¥₹]/;
+  const scriptOf = (ch) => {
+    const cp = ch.codePointAt(0);
+    if ((cp >= 0x0600 && cp <= 0x06ff) || (cp >= 0x0750 && cp <= 0x077f) || (cp >= 0xfb50 && cp <= 0xfdff) || (cp >= 0xfe70 && cp <= 0xfeff)) return 'arab';
+    if ((cp >= 0x0900 && cp <= 0x097f) || (cp >= 0xa8e0 && cp <= 0xa8ff)) return 'deva';
+    return NEUTRAL.test(ch) ? 'neutral' : 'latin';
+  };
+  G.runs = (str) => {
+    const out = [];
+    for (const ch of String(str)) {
+      const sc = scriptOf(ch), last = out[out.length - 1];
+      if (sc === 'neutral') { if (last) last.text += ch; else out.push({ script: 'latin', text: ch }); continue; }
+      if (last && last.script === sc) last.text += ch;
+      else if (last && last.script === 'latin' && /^\s*$/.test(last.text)) { last.script = sc; last.text += ch; }
+      else out.push({ script: sc, text: ch });
+    }
+    // trailing spaces of a run belong between runs: move them to the next run's start for correct spacing
+    return out;
+  };
+  G.isRTL = (str) => /[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]/.test(String(str));
+  // which font family draws this Arabic-script run: lang 'ur' | 'ar' forces it, otherwise Urdu/Persian
+  // letters (ی ک گ ٹ ڈ ڑ ں ہ ھ ے) pick Nastaliq and Arabic letters pick Naskh
+  const arabKind = (text, lang) => (lang === 'ar' ? 'arabic' : lang === 'ur' || lang === 'fa' ? 'urdu' : /[یکگٹڈڑںہھے]/.test(text) ? 'urdu' : /[يكة]/.test(text) ? 'arabic' : 'urdu');
+  // lay out runs: fontFn(fam, size, weight) → CSS font for Latin runs
+  G.layoutText = (ctx, str, { size = 48, fam = 'Caveat', weight = 700, lang, fontFn = G.font } = {}) => {
+    const runs = G.runs(str);
+    // bidi: spaces/punctuation between runs of opposite direction belong to the base direction,
+    // so a run that goes against the base hands its trailing neutrals to the next run
+    const firstStrong = runs.find((r) => /[^\s\d.,:;!?'"()[\]\-–—·•…/%+&@#*=<>|_~^$€£¥₹]/.test(r.text));
+    const rtlBase = !!firstStrong && firstStrong.script === 'arab';
+    for (let i = 0; i < runs.length - 1; i++) {
+      const against = rtlBase ? runs[i].script !== 'arab' : runs[i].script === 'arab';
+      if (!against) continue;
+      const m = /[\s.,:;!?'"()[\]\-–—·•…/%+&@#*=<>|_~^]*$/.exec(runs[i].text)[0]; // digits stay with their run
+      if (m && m.length < runs[i].text.length) { runs[i].text = runs[i].text.slice(0, -m.length); runs[i + 1].text = m + runs[i + 1].text; }
+    }
+    let total = 0;
+    ctx.save();
+    for (const r of runs) {
+      if (r.script === 'latin') { r.font = fontFn(size, fam, weight); r.dir = 'ltr'; }
+      else {
+        const kind = r.script === 'deva' ? 'devanagari' : arabKind(r.text, lang);
+        const w = kind === 'urdu' ? 400 : weight >= 600 ? 700 : 400;
+        r.font = `${w} ${Math.round(size * G.SCRIPT_SCALE[kind])}px "${G.SCRIPT_FONTS[kind]}"`;
+        r.dir = r.script === 'arab' ? 'rtl' : 'ltr';
+      }
+      ctx.font = r.font; ctx.direction = r.dir;
+      r.w = ctx.measureText(r.text).width;
+      total += r.w;
+    }
+    ctx.restore();
+    return { runs, total, rtlBase };
+  };
+  // draw laid-out text at (x, y); align is visual: 'left' | 'center' | 'right' ('start'/'end' follow the text's direction)
+  G.drawRuns = (ctx, lay, x, y, { align = 'left', baseline = 'alphabetic', color, stroke, strokeW = 8 } = {}) => {
+    let a = align;
+    if (a === 'start') a = lay.rtlBase ? 'right' : 'left';
+    if (a === 'end') a = lay.rtlBase ? 'left' : 'right';
+    const left = a === 'center' ? x - lay.total / 2 : a === 'right' ? x - lay.total : x;
+    const order = lay.rtlBase ? [...lay.runs].reverse() : lay.runs;
+    let cx = left;
+    ctx.save();
+    ctx.textBaseline = baseline; ctx.textAlign = 'left';
+    for (const r of order) {
+      ctx.font = r.font; ctx.direction = r.dir;
+      if (stroke) { ctx.lineJoin = 'round'; ctx.strokeStyle = stroke; ctx.lineWidth = strokeW; ctx.strokeText(r.text, cx, y); }
+      if (color) ctx.fillStyle = color;
+      ctx.fillText(r.text, cx, y);
+      cx += r.w;
+    }
+    ctx.restore();
+    return lay.total;
+  };
+  const simple = (str) => { for (const ch of String(str)) { const sc = scriptOf(ch); if (sc === 'arab' || sc === 'deva') return false; } return true; };
+
+  // decorative text (tiny timestamps, background signage) that the visual QA should not judge: G.decor(() => { … })
+  G.decorDepth = 0;
+  G.decor = (fn) => { G.decorDepth++; try { return fn(); } finally { G.decorDepth--; } };
+  // fam: one family name ('Caveat') or a CSS stack ('"Inter", system-ui, sans-serif')
+  G.font = (size, fam = 'Caveat', weight = 700) => `${weight} ${size}px ${/[,"]/.test(fam) ? fam : '"' + fam + '", system-ui, sans-serif'}`;
+  G.text = (ctx, str, x, y, { size = 48, fam = 'Caveat', weight = 700, color = G.C.ink, align = 'left', baseline = 'alphabetic', boil = 0.8, alpha = 1, stroke, strokeW = 8, lang } = {}) => {
+    str = String(str);
     ctx.save();
     ctx.globalAlpha *= alpha;
-    ctx.font = G.font(size, fam, weight);
-    ctx.textAlign = align;
-    ctx.textBaseline = baseline;
     const j = G.jit(str.length * 13 + size, 1, boil);
-    if (stroke) {
-      ctx.lineJoin = 'round';
-      ctx.strokeStyle = stroke;
-      ctx.lineWidth = strokeW;
-      ctx.strokeText(str, x + j[0], y + j[1]);
+    if (simple(str)) {
+      ctx.font = G.font(size, fam, weight);
+      ctx.textAlign = align;
+      ctx.textBaseline = baseline;
+      if (stroke) {
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = strokeW;
+        ctx.strokeText(str, x + j[0], y + j[1]);
+      }
+      ctx.fillStyle = color;
+      ctx.fillText(str, x + j[0], y + j[1]);
+    } else {
+      G.drawRuns(ctx, G.layoutText(ctx, str, { size, fam, weight, lang }), x + j[0], y + j[1], { align, baseline, color, stroke, strokeW });
     }
-    ctx.fillStyle = color;
-    ctx.fillText(str, x + j[0], y + j[1]);
     ctx.restore();
   };
-  G.measure = (ctx, str, size, fam = 'Caveat', weight = 700) => {
+  G.measure = (ctx, str, size, fam = 'Caveat', weight = 700, lang) => {
+    str = String(str);
+    if (!simple(str)) return G.layoutText(ctx, str, { size, fam, weight, lang }).total;
     ctx.save();
     ctx.font = G.font(size, fam, weight);
     const w = ctx.measureText(str).width;
@@ -391,7 +483,7 @@
 
   G.post = (ctx, t, { vignette = 0.35, grain = 0.05, paper = 0.55 } = {}) => {
     ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.setTransform(G.scale || 1, 0, 0, G.scale || 1, 0, 0);
     if (paper > 0) {
       ctx.globalCompositeOperation = 'multiply';
       ctx.globalAlpha = paper;

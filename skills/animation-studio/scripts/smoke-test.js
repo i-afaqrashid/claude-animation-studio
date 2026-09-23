@@ -7,6 +7,7 @@
 //   4. a second render in the same project folder is refused while the first one still succeeds
 //   5. formats: --format 9:16 renders 1080x1920 frames; the app-promo example (UI kit) scores and draws
 //   6. preview (headless self-test), cast sheet, clip --gif, an exact LUFS target, the Math.random warning
+//   7. v0.6 tools: draft stills, qa, plan, poster, srt, pacing, a forbidden brand claim, formats (9:16 draft)
 // Usage: node <skill>/scripts/smoke-test.js        (takes ~2–4 minutes; needs Node 22+, ffmpeg, Chrome)
 const fs = require('fs');
 const os = require('os');
@@ -138,6 +139,34 @@ const probe = (file) => JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-sho
   const lint = run(['engine/render.js', 'stills', '1']);
   fs.writeFileSync(filmPath, goodFilm);
   pass('a film using Math.random() gets a determinism warning', /frames must be a pure function of t/.test(lint.out) && /film\.js:\d+/.test(lint.out), lint.out.slice(0, 200));
+
+  // 7. v0.6 tools (on the first smoke film)
+  const dr = run(['engine/render.js', 'stills', '2', '--draft']);
+  const dsz = fs.existsSync(path.join(proj, 'out', 'stills', 't_002.00.png')) ? pngSize(path.join(proj, 'out', 'stills', 't_002.00.png')) : [];
+  pass('--draft stills render at half size (960x540)', dr.code === 0 && dsz[0] === 960 && dsz[1] === 540, dsz.join('x'));
+  const q = run(['engine/render.js', 'qa', '@land', '2']);
+  pass('qa probes every drawn word', q.code === 0 && /visual QA: 2 frames/.test(q.out), q.out.split('\n')[0]);
+  const pl = run(['engine/render.js', 'plan']);
+  const planMd = path.join(proj, 'out', 'plan.md');
+  pass('plan → out/plan.md with a bar map and a claims checklist', pl.code === 0 && fs.existsSync(planMd) && /## Bar map/.test(fs.readFileSync(planMd, 'utf8')) && /- \[ \] "a tiny film, made of code\."/.test(fs.readFileSync(planMd, 'utf8')), pl.out.split('\n')[0]);
+  const po = run(['engine/render.js', 'poster', '--title', 'Every star is a note']);
+  const p1 = path.join(proj, 'out', 'poster-1.png');
+  const psz = fs.existsSync(p1) ? pngSize(p1) : [];
+  pass('poster → three 1280x720 thumbnails', po.code === 0 && psz[0] === 1280 && psz[1] === 720 && fs.existsSync(path.join(proj, 'out', 'poster-3.png')), psz.join('x') || po.out.slice(-200));
+  const sr = run(['engine/render.js', 'srt']);
+  const srtF = path.join(proj, 'out', 'smoke-film.srt');
+  pass('srt → subtitle file from the captions', sr.code === 0 && fs.existsSync(srtF) && /-->/.test(fs.readFileSync(srtF, 'utf8')), sr.out.split('\n')[0]);
+  const pc = run(['engine/render.js', 'pacing']);
+  pass('pacing measures the hook and the cuts', pc.code === 0 && /first movement/.test(pc.out) && fs.existsSync(path.join(proj, 'out', 'pacing.svg')), pc.out.split('\n')[0]);
+  fs.writeFileSync(path.join(proj, 'brand.json'), JSON.stringify({ name: 'Smoke', colors: { primary: '#E0703E' }, claims: { forbidden: ['tiny film'] } }));
+  const bl = run(['engine/render.js', 'stills', '1']);
+  fs.rmSync(path.join(proj, 'brand.json'));
+  pass('a film saying a forbidden brand claim gets a warning', /brand\.json forbids/.test(bl.out) && /tiny film/.test(bl.out), bl.out.slice(0, 160));
+  const fm = run(['engine/render.js', 'formats', '9:16', '2', '--draft']);
+  const fmF = path.join(proj, 'out', 'smoke-film-9x16-draft.mp4');
+  let fmOk = fm.code === 0 && fs.existsSync(fmF);
+  if (fmOk) { const pr = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=width,height', '-of', 'json', fmF]).toString()); fmOk = pr.streams[0].width === 540 && pr.streams[0].height === 960; }
+  pass('formats 9:16 --draft → a vertical 540x960 film from the same score', fmOk, fm.code ? fm.out.slice(-300) : '');
 
   const failed = results.filter((r) => !r.ok).length;
   console.log(`\n${results.length - failed}/${results.length} checks passed${failed ? '' : ' — engine OK'}`);

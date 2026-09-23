@@ -8,8 +8,9 @@
   const { m, makeClock, placeBar, makeChords } = MU;
 
   const FPS = 30;
-  // '16:9' (YouTube, X), '9:16' (Reels / TikTok / Shorts), '1:1' or '4:5' (feeds). The film lays itself out for any.
-  const FORMAT = '16:9';
+  // '16:9' (YouTube, X), '9:16' (Reels / TikTok / Shorts), '1:1' or '4:5' (feeds). The film lays itself out for any,
+  // and `render.js formats 16:9,9:16` renders it in several at once (pickFormat honours that override).
+  const FORMAT = U.pickFormat('16:9');
   const [W, H] = U.formatSize(FORMAT);
   const SAFE = U.safeArea(W, H); // keep captions and titles inside this box
   const WIDE = W / H > 1.2;

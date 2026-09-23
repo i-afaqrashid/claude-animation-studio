@@ -17,7 +17,10 @@
     card: '#FFFFFF', line: 'rgba(42,35,32,0.10)', shadow: 'rgba(90,55,30,0.16)',
     font: null, // null = UI.FONT; or a loaded brand font family
   };
-  UI.setTheme = (o) => Object.assign(UI.theme, o);
+  // setTheme = the film's own choice; setThemeDefaults = the brand kit's (never overrides the film)
+  const chosen = new Set();
+  UI.setTheme = (o) => { for (const k of Object.keys(o)) chosen.add(k); return Object.assign(UI.theme, o); };
+  UI.setThemeDefaults = (o) => { for (const [k, v] of Object.entries(o)) if (!chosen.has(k) && v !== undefined) UI.theme[k] = v; return UI.theme; };
   const th = UI.theme;
   const fam = (f) => f || th.font || UI.FONT;
 
@@ -26,7 +29,11 @@
   UI.fadeIn = (t, t0, d = 0.25) => clamp((t - t0) / d);
 
   // ---------- text ----------
+  // Urdu / Arabic / Hindi (and mixed lines) go through G.layoutText, which picks a font per script
+  const uiFont = (size, stack, weight) => `${weight} ${size}px ${stack}`;
+  const multi = (str) => /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF\u0900-\u097F]/.test(String(str));
   UI.measure = (ctx, str, size, weight = 700, spacing = 0, font) => {
+    if (multi(str)) return G.layoutText(ctx, str, { size, fam: fam(font), weight, fontFn: uiFont }).total;
     ctx.save(); ctx.font = `${weight} ${size}px ${fam(font)}`; ctx.letterSpacing = `${spacing}px`;
     const w = ctx.measureText(str).width; ctx.restore(); return w;
   };
@@ -34,6 +41,12 @@
   UI.fit = (ctx, str, maxW, size, weight = 700, spacing = 0, font) => Math.min(size, Math.floor((size * maxW) / Math.max(1, UI.measure(ctx, str, size, weight, spacing, font))));
   UI.text = (ctx, str, x, y, { size = 40, weight = 700, color = th.ink, align = 'left', italic = false, spacing = 0, alpha = 1, base = 'alphabetic', font, maxW } = {}) => {
     if (maxW) size = UI.fit(ctx, str, maxW, size, weight, spacing, font);
+    if (multi(str)) {
+      ctx.save(); ctx.globalAlpha *= alpha;
+      G.drawRuns(ctx, G.layoutText(ctx, str, { size, fam: fam(font), weight, fontFn: uiFont }), x, y, { align, baseline: base, color });
+      ctx.restore();
+      return;
+    }
     ctx.save();
     ctx.globalAlpha *= alpha;
     ctx.font = `${italic ? 'italic ' : ''}${weight} ${size}px ${fam(font)}`;

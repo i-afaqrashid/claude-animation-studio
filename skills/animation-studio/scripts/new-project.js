@@ -43,8 +43,9 @@ fs.writeFileSync(path.join(dest, '.gitignore'), 'out/\n');
 if (format) {
   const sp = path.join(dest, 'score.js');
   const score = fs.readFileSync(sp, 'utf8');
-  if (!/const FORMAT = '[^']*';/.test(score)) console.log(`note: this starting point has a fixed layout; --format ${format} was not applied`);
-  else fs.writeFileSync(sp, score.replace(/const FORMAT = '[^']*';/, `const FORMAT = '${format}';`));
+  const re = /const FORMAT = U\.pickFormat\('[^']*'\);/; // only films that lay themselves out use pickFormat
+  if (!re.test(score)) console.log(`note: this starting point has a fixed layout; --format ${format} was not applied`);
+  else fs.writeFileSync(sp, score.replace(re, `const FORMAT = U.pickFormat('${format}');`));
 }
 
 // preflight: tell the user what is missing instead of failing later

@@ -111,6 +111,13 @@ function formatSize(f) {
   if (!FORMATS[f]) throw new Error(`unknown FORMAT "${f}" (use ${Object.keys(FORMATS).join(', ')} or [width, height])`);
   return FORMATS[f].slice();
 }
+// The film's format, unless a render asks for another one: `render.js video --format 9:16` sets
+// ANIM_FORMAT for Node and ?format=9:16 for the page, so one score can render every format.
+function pickFormat(def) {
+  if (typeof process !== 'undefined' && process.env && process.env.ANIM_FORMAT) return process.env.ANIM_FORMAT;
+  if (typeof location !== 'undefined' && location.search) { const f = new URLSearchParams(location.search).get('format'); if (f) return f; }
+  return def;
+}
 // Where text, faces and logos stay visible. On tall (9:16) videos the platforms cover the top
 // (header), the bottom (caption, handle, audio) and the right edge (like/share buttons);
 // other formats keep a 5% margin.
@@ -120,6 +127,6 @@ function safeArea(w, h) {
   return { x: m, y: m, w: w - 2 * m, h: h - 2 * m };
 }
 
-const U = { mulberry32, hash, noise1, clamp, lerp, invLerp, remap, smooth, ease, tween, springKick, pulse, keys, FORMATS, formatSize, safeArea };
+const U = { mulberry32, hash, noise1, clamp, lerp, invLerp, remap, smooth, ease, tween, springKick, pulse, keys, FORMATS, formatSize, safeArea, pickFormat };
 if (typeof module !== 'undefined') module.exports = U; else globalThis.U = U;
 })();

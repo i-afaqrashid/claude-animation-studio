@@ -1,9 +1,9 @@
 # Engine API
 
-All engine files are UMD-style IIFEs: `require()` in Node, globals in the browser (`U`, `MUSIC`, `G`, `Ch`, `Studio`). Load order in `index.html`: `engine/util.js`, `engine/music.js`, `score.js`, `engine/video/gfx.js`, `engine/video/chars.js`, `engine/video/ui.js`, `engine/video/boot.js`, then film files (template layout; the world-cup example boots itself and skips music.js and boot.js).
+All engine files are UMD-style IIFEs: `require()` in Node, globals in the browser (`U`, `MUSIC`, `G`, `Ch`, `Studio`). Load order in `index.html`: `engine/util.js`, `engine/music.js`, `score.js`, `engine/video/gfx.js`, `engine/video/chars.js`, `engine/video/ui.js`, `engine/video/shots.js`, `engine/subs.js`, `engine/video/boot.js`, then film files (template layout; the world-cup example boots itself and skips music.js and boot.js).
 
 ## util.js (`U`)
-`mulberry32(seed)` → rng() · `hash(...xs)` → [0,1) stateless · `noise1(x, seed)` smooth −1…1 · `clamp lerp invLerp remap smooth` · `ease.{linear,inQuad,outQuad,inOutQuad,inCubic,outCubic,inOutCubic,outQuart,inQuart,outExpo,inExpo,outBack(t,s),inBack,outElastic,outBounce}` · `tween(t, t0, t1, a, b, ease)` · `keys(t, [[t, v, ease?], ...])` keyframes · `springKick(t, t0, freq, decay)` (starts at 0) · `pulse(t, t0, decay)` (1 at t0, decays) · `FORMATS` (`'16:9'` 1920×1080, `'9:16'` 1080×1920, `'1:1'` 1080×1080, `'4:5'` 1080×1350) · `formatSize(format | [w, h])` → `[w, h]` (even sizes) · `safeArea(w, h)` → `{x, y, w, h}` (9:16: top 11.5%, bottom 22%, right 140px reserved for platform UI; else a 5% margin).
+`mulberry32(seed)` → rng() · `hash(...xs)` → [0,1) stateless · `noise1(x, seed)` smooth −1…1 · `clamp lerp invLerp remap smooth` · `ease.{linear,inQuad,outQuad,inOutQuad,inCubic,outCubic,inOutCubic,outQuart,inQuart,outExpo,inExpo,outBack(t,s),inBack,outElastic,outBounce}` · `tween(t, t0, t1, a, b, ease)` · `keys(t, [[t, v, ease?], ...])` keyframes · `springKick(t, t0, freq, decay)` (starts at 0) · `pulse(t, t0, decay)` (1 at t0, decays) · `FORMATS` (`'16:9'` 1920×1080, `'9:16'` 1080×1920, `'1:1'` 1080×1080, `'4:5'` 1080×1350) · `formatSize(format | [w, h])` → `[w, h]` (even sizes) · `safeArea(w, h)` → `{x, y, w, h}` (9:16: top 11.5%, bottom 22%, right 140px reserved for platform UI; else a 5% margin) · `pickFormat(default)` → the `--format` override if a render asked for one, else the default.
 
 ## music.js (`MUSIC`)
 `m('Bb3')` → 58 · `mtof(midi)` · `makeClock({bpm, offset, beatsPerBar})` → `{BEAT, BAR, OFFSET, T(bar, beat), beatPos(t), phase(t), eachStep(bar0, bar1, stepsPerBar, fn(t, bar, step))}` · `placeBar(clock, bar8ths, bar, transpose)` → `[{t, dur, midi}]` · `makeChords(clock, table, rows)` → `{chords:[{t0,t1,bar,name,notes,bass}], chordAt(t)}`.
@@ -27,7 +27,7 @@ Return a mono Float32Array unless noted.
 - Points: `rrPts(x, y, w, h, r, step)`, `ellPts(cx, cy, rx, ry)`, `polyPts(corners, step)`, `path(ctx, pts, closed)`, `wobble(pts, seed, amp)`
 - Drawing: `shape(ctx, pts, {fill, stroke, lw, seed, amp, hatch:{color,gap,angle,lw}, closed, alpha, second})` · `rrect(ctx, x, y, w, h, r, o)` · `ellipse(ctx, cx, cy, rx, ry, o)` · `poly(ctx, corners, o)` · `line(ctx, pts, {color, lw, seed, amp, step, alpha})` · `limb(ctx, pts, {color, lw, outline})` outlined noodle · `hatch(ctx, bbox, o)`
 - Paper: `tornPaper(ctx, x, y, w, h, {fill, seed, shadow, edge, tear})` · `tape(ctx, x, y, w, h, rot, seed)`
-- Text: `text(ctx, str, x, y, {size, fam, weight, color, align, baseline, boil, alpha, stroke, strokeW})` · `measure(ctx, str, size, fam, weight)` · `caption(ctx, {t, end, text, x, y, rot, size, small}, t)` · `bubble(ctx, text, x, y, tailX, tailY, t, t0, t1, {size})`
+- Text: `text(ctx, str, x, y, {size, fam, weight, color, align, baseline, boil, alpha, stroke, strokeW, lang})` · `measure(ctx, str, size, fam, weight, lang)`: any script (Urdu/Arabic/Hindi runs get their fonts, RTL runs are laid out in reading order; `fam` may be a CSS stack) · `layoutText(ctx, str, opts)` → `{runs, total, rtlBase}` · `drawRuns(ctx, lay, x, y, opts)` · `runs(str)` · `isRTL(str)` · `decor(fn)` (text drawn inside is ignored by the visual QA) · `caption(ctx, {t, end, text, x, y, rot, size, small}, t)` · `bubble(ctx, text, x, y, tailX, tailY, t, t0, t1, {size})`
 - Images: `photo(ctx, img, x, y, w, h, {rot, caption, border, tape, seed})` taped paper print of a user image
 - FX: `confetti(ctx, t, t0, {n, seed, spawn, fall, x0, x1})` · `firework(ctx, f, t, x, y, scale)` with `f = {t, launch, seed, size, color, color2}` · `rays(ctx, cx, cy, {n, r0, r1, color, lw, alpha, spin})` · `star(ctx, x, y, r, {fill, rot})` · `heart(ctx, x, y, s)`
 - Textures: `initTextures()` (Studio calls it), `post(ctx, t, {paper, vignette, grain})`, `makeCanvas(w, h)`
@@ -50,13 +50,19 @@ Crisp app UI (system font) for promos; every call is a pure function of its argu
 - Transitions: `UI.iris(ctx, t, tc, {cx, cy, dur, color})` circle wipe (closed at `tc`) · `UI.logo(ctx, img, cx, cy, size, t, t0)`
 
 ## video/boot.js (`Studio`)
-`Studio.film({ draw(ctx, t), post: {paper, vignette, grain} | fn(t), fadeOut = 1.6, init(ctx), duration })` · `Studio.loadImage('assets/x.png')` → Promise<Image> (await it in `init`). It sizes the canvas to the score's format, loads the fonts, builds the textures, defines `window.renderAt(t)` (setTime → clear → draw → post → fade → PNG) and sets `window.READY`.
+`Studio.film({ draw(ctx, t), post: {paper, vignette, grain} | fn(t), fadeOut = 1.6, init(ctx), duration })` · `Studio.loadImage('assets/x.png')` → Promise<Image> · `Studio.loadJSON('out/voice.json')` → object or null · `Studio.loadFont(family, src, weight)` · `Studio.cache(key, drawFn, {variants = 3})` → a canvas of a static layer (draw it with `ctx.drawImage(c, 0, 0, G.W, G.H)`) · `Studio.brand` (brand.json, with `logoImg`) · `Studio.brandTheme(brand)` · `window.renderAt(t, fmt, scale)` · `window.probeAt(t, scale)` → every drawn text with box, size, colour, contrast (await them in `init` where async). It sizes the canvas to the score's format, loads the fonts, builds the textures, defines `window.renderAt(t)` (setTime → clear → draw → post → fade → PNG) and sets `window.READY`.
 
 ## score.js `markers` (optional, recommended)
 `markers: { name: t | { t, sync: 'av' | 'a' | 'v' } }` exported on `SCORE`. Every render.js time argument accepts seconds (`12.5`), `bar:beat` from the score clock (`8:2` = `T(8, 2)`, needs `SCORE.T`) or `@name` with an optional offset in seconds (`@drop`, `@drop-2`, `@drop+0.5`). A bad time fails before Chrome starts.
 
 ## scripts/new-project.js
 `node new-project.js <dir> [--format 16:9|9:16|1:1|4:5] [--from app-promo|world-cup-2026]`. `--format` rewrites `const FORMAT` in the new score.js (the template and app-promo lay themselves out from it).
+
+## subs.js (`Subs`, Node + browser)
+`Subs.draw(ctx, t, subtitles, {style: 'pop'|'karaoke'|'box'|'clean', size, y, x, color, highlight, fam, maxW})` · `Subs.words(line)` → word timings · `Subs.toSRT(subs)` · `Subs.toVTT(subs)` · `Subs.fromCaptions(captions)`.
+
+## video/shots.js (`Shots`)
+`Shots.film([{ at, draw(ctx, t, s), in: 'cut'|'fade'|'dip'|'iris'|'irisIn'|'wipe'|'push'|'whip'|'zoom'|'flash'|'paper' or {type, dur, dir, color, at: [x, y], text}, cam: fn(s) | {x, y, zoom, rot} }], {end})` → draw function (`s = {t0, t1, u, dt, cam}`) · cameras `Shots.push(z0, z1)`, `pan(x0, x1, y0, y1)`, `shake(amp, from, decay)`, `handheld(amp)`, `combine(...)` · `Shots.cam(ctx, cam)` · `Shots.layers(ctx, cam, [{depth, draw}])` parallax.
 
 ## render.js (run from the project root)
 `stills t1 t2 …` · `sheet t0 t1 n cols` · `board [t …]` · `clip from to [workers]` · `video [workers]` · `mux [name]` · `check [name]` · `verify [name]`.
