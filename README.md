@@ -6,13 +6,13 @@
 
 https://github.com/user-attachments/assets/9168dc15-a663-4611-a5de-5dd5a20bd7b9
 
-*From "Claude × Afaq, World Cup 2026", a 58-second film Claude made with this skill. The frames and the soundtrack come from zero samples, stock clips, or music libraries: drums, bass, brass, the crowd, and a street chanting "o-lé".*
+*An 18-second moment from "Claude × Afaq, World Cup 2026", a 58-second film Claude made with this skill. The frames and the soundtrack come from zero samples, stock clips, or music libraries: drums, bass, brass, the crowd, and a street chanting "o-lé".*
 
 ## What it does
 
 Ask Claude for a video, and it:
 
-1. writes the story as a **song structure** (intro → tension → silence → drop → outro),
+1. writes the story as a **song structure** that fits the moment (a last-minute goal might get a tense build, a beat of silence and a huge drop),
 2. puts every moment in one **score file** that both the music and the animation read,
 3. **synthesizes the soundtrack** in plain JavaScript: drums, bass, pads, brass, music box, formant-synthesized crowds and choirs, and sound effects,
 4. **draws every frame** in a hand-drawn paper-cutout style (boiling pencil lines, hatching, torn-paper captions),
