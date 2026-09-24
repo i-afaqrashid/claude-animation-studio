@@ -160,26 +160,32 @@
   Ch.PERSON_STYLE = {
     skin: C.skin, skinDark: null, hair: C.hair, shirt: C.kit, trim: C.teal, collar: C.cream, shorts: C.navy,
     robe: null, // thobe / abaya / sari colour (defaults: white thobe, black abaya, magenta sari); suit: jacket colour
-    headwear: 'none', // none | topi (prayer cap) | cap | turban | ghutra (headscarf + agal)
+    headwear: 'none', // none | topi (prayer cap) | cap | turban | ghutra (headscarf + agal) | pagri (groom's turban with a turra fan) | dupatta (bride's head drape)
     headwearColor: null,
     shoes: '#F4F1EA', name: '', number: '',
     hairStyle: 'quiff', // quiff | short | buzz | curlytop | long | curly | bun | ponytail | bald | hijab
     hijab: '#6B4E8A',
     facialHair: 'none', // none | stubble | mustache | trimmed (short beard + mustache) | beard
-    glasses: 'none', // none | round | square | sun (round sunglasses)
+    glasses: 'none', // none | round | square | bold (big rectangular optical frames, Beckham-style) | sun (round sunglasses)
     glassesColor: null, // frame colour (default ink; gold for sun)
-    outfit: 'jersey', // jersey | tee | hoodie | shirt | dress | kameez | thobe | abaya | sari | suit
+    outfit: 'jersey', // jersey | tee | hoodie | shirt | dress | kameez | thobe | abaya | sari | suit | sherwani | lehenga
+    sehra: false, // groom's flower veil hanging from a pagri
+    garland: null, // 'flowers' (marigold + roses) | 'notes' (a money garland) | 'roses'
+    jewelry: false, // bridal: maang tikka, jhumkas, nath
+    bangles: null, // a colour: glass bangles on both wrists
+    mehndi: false, // henna patterns on the hands
     bottoms: 'shorts', // shorts | pants | shalwar | skirt   (a dress brings its own skirt)
     sleeves: null, // short | long | none   (default depends on the outfit)
     build: 'regular', // slim | regular | broad
     print: '', printColor: C.cream, // big text on a tee / hoodie
     freckles: false,
   };
-  const SLEEVES = { jersey: 'short', tee: 'short', dress: 'short', hoodie: 'long', shirt: 'long', kameez: 'long', thobe: 'long', abaya: 'long', sari: 'short', suit: 'long' };
-  const ROBE = { thobe: '#F3F1EA', abaya: '#1F1D24', sari: '#C2185B', suit: '#2C3550' };
+  const SLEEVES = { jersey: 'short', tee: 'short', dress: 'short', hoodie: 'long', shirt: 'long', kameez: 'long', thobe: 'long', abaya: 'long', sari: 'short', suit: 'long', sherwani: 'long', lehenga: 'elbow' };
+  const ROBE = { thobe: '#F3F1EA', abaya: '#1F1D24', sari: '#C2185B', suit: '#2C3550', sherwani: '#EFE0C0', lehenga: '#B0102A' };
+  const GOLD = '#D4A83A';
   const ROBES = ['thobe', 'abaya', 'sari'];
   const isDark = (c) => { if (typeof c !== 'string' || c[0] !== '#') return false; const n = parseInt(c.slice(1), 16); return (0.3 * ((n >> 16) & 255) + 0.59 * ((n >> 8) & 255) + 0.11 * (n & 255)) < 70; };
-  const BUILD = { slim: 0.86, regular: 1, broad: 1.18 };
+  const BUILD = { slim: 0.86, regular: 1, broad: 1.18, heavy: 1.3 };
 
   Ch.person = (ctx, o) => {
     const st = Object.assign({}, Ch.PERSON_STYLE, o.style || {});
@@ -192,11 +198,14 @@
       gesture = null, walk = 0,
     } = o;
     const outfit = st.outfit, dress = outfit === 'dress', kameez = outfit === 'kameez';
-    const robe = ROBES.includes(outfit), suit = outfit === 'suit';
+    const robe = ROBES.includes(outfit), suit = outfit === 'suit', sherwani = outfit === 'sherwani', lehenga = outfit === 'lehenga';
     const robeCol = st.robe || ROBE[outfit] || st.shirt;
     if (robe) { if (outfit !== 'sari') st.shirt = robeCol; st.pants = robeCol; }
     if (suit) st.pants = st.pants || robeCol;
-    let bottoms = dress ? 'skirt' : robe || suit ? 'pants' : st.bottoms;
+    if (sherwani) { st.shirt = robeCol; st.pants = st.pants || '#F4EEE0'; }
+    if (lehenga) { st.pants = robeCol; if (st.shirt === Ch.PERSON_STYLE.shirt) st.shirt = shade(robeCol, 0.85); }
+    const gold = st.trim === C.teal ? GOLD : st.trim;
+    let bottoms = dress ? 'skirt' : robe || suit || sherwani || lehenga ? 'pants' : st.bottoms;
     const loose = bottoms === 'shalwar'; // loose trousers
     const dark = isDark(st.shirt);
     const detail = dark ? '#5E5B66' : shade(st.shirt, 0.7); // seams/buttons that read on any fabric
@@ -289,6 +298,18 @@
       else if (pose === 'floor') G.rrect(ctx, -104 * bw, -34, 208 * bw, 62, 28, { fill: st.shirt, lw: 4, seed: seed + 140, hatch: torsoHatch });
     }
     if (robe && seated) G.rrect(ctx, -100 * bw, -34, 200 * bw, 88, 30, { fill: robeCol, lw: 4, seed: seed + 140, hatch: torsoHatch });
+    if (sherwani && seated) { G.rrect(ctx, -100 * bw, -34, 200 * bw, 84, 30, { fill: robeCol, lw: 4, seed: seed + 140, hatch: torsoHatch }); G.line(ctx, [[-94 * bw, 44], [94 * bw, 44]], { lw: 6, color: gold, seed: seed + 141 }); }
+    // a lehenga: a wide, heavy skirt to the ground with gold border bands (spread around her when seated)
+    if (lehenga) {
+      const top = seated ? -30 : hip - 34, bot = seated ? 70 : -4, wTop = 74 * bw, wBot = seated ? 190 : 150 * bw;
+      const pts = [[-wTop, top], [wTop, top]];
+      for (let k = 0; k <= 12; k++) { const u = k / 12; pts.push([wBot - 2 * wBot * u, bot + Math.sin(u * Math.PI * 6) * 5]); }
+      G.shape(ctx, pts, { fill: robeCol, lw: 4, seed: seed + 142, hatch: skirtHatch });
+      for (const [yy, lw] of [[bot - 14, 9], [bot - 34, 4]]) { const k = (yy - top) / (bot - top), ww = wTop + (wBot - wTop) * k; G.line(ctx, [[-ww, yy], [ww, yy]], { lw, color: gold, seed: seed + 143 + lw }); }
+      ctx.save(); ctx.fillStyle = gold; // scattered gold buti
+      for (let k = 0; k < 26; k++) { const u = U.hash(seed, k, 1), v = U.hash(seed, k, 2) * 0.8 + 0.08, yy = top + (bot - top) * v, ww = wTop + (wBot - wTop) * v; ctx.beginPath(); ctx.arc(-ww * 0.9 + 1.8 * ww * 0.9 * u, yy, 3.2, 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore();
+    }
     // a sari's long wrapped skirt (the pleats show as lines), under the blouse
     if (outfit === 'sari' && !seated) {
       G.poly(ctx, [[-78 * bw, hip - 20], [78 * bw, hip - 20], [96 * bw, -12], [-96 * bw, -12]], { fill: robeCol, lw: 4, seed: seed + 142, step: 22, hatch: skirtHatch });
@@ -299,10 +320,14 @@
     // a thobe or an abaya runs all the way to the ankles
     const longShirt = kameez && !seated;
     const fullRobe = (outfit === 'thobe' || outfit === 'abaya') && !seated;
+    const longCoat = sherwani && !seated;
     const torsoPts = fullRobe
       ? [[-78 * bw, sh], [78 * bw, sh], [82 * bw, hip - 10], [98 * bw, -16], [-98 * bw, -16], [-82 * bw, hip - 10]]
+      : longCoat
+        ? [[-80 * bw, sh], [80 * bw, sh], [84 * bw, hip - 6], [96 * bw, hip + 118], [-96 * bw, hip + 118], [-84 * bw, hip - 6]]
       : longShirt
         ? [[-78 * bw, sh], [78 * bw, sh], [80 * bw, hip - 10], [90 * bw, hip + 104], [-90 * bw, hip + 104], [-80 * bw, hip - 10]]
+        : lehenga ? [[-74 * bw, sh], [74 * bw, sh], [72 * bw, hip - 22], [-72 * bw, hip - 22]]
         : [[-78 * bw, sh], [78 * bw, sh], [74 * bw, hip + (suit ? 30 : 10)], [-74 * bw, hip + (suit ? 30 : 10)]];
     const torso = G.poly(ctx, torsoPts, { fill: suit ? robeCol : st.shirt, lw: 4.5, seed: seed + 9, step: 20, hatch: torsoHatch });
     if (fullRobe) {
@@ -315,6 +340,35 @@
       G.poly(ctx, [[-8, sh + 8], [8, sh + 8], [12, sh + 70], [0, sh + 90], [-12, sh + 70]], { fill: st.trim === C.teal ? '#B23A3A' : st.trim, lw: 2.5, seed: seed + 151, step: 10 });
       for (const sd of [-1, 1]) G.poly(ctx, [[sd * 30, sh - 2], [sd * 58 * bw, sh + 6], [sd * 20, sh + 110], [sd * 4, sh + 100]], { fill: shade(robeCol, 0.8), lw: 3.5, seed: seed + 152 + sd, step: 14 });
       G.ellipse(ctx, 0, hip - 8, 4, 4, { fill: shade(robeCol, 0.6), lw: 1.5, seed: seed + 155, amp: 0.3 });
+    }
+    if (sherwani) {
+      // a bandhgala collar, gold buttons down the front, gold embroidery on the opening, chest and hem
+      const hem = seated ? -30 : hip + 116;
+      G.rrect(ctx, -34, sh - 14, 68, 24, 8, { fill: robeCol, lw: 3, seed: seed + 158 });
+      G.line(ctx, [[-32, sh - 4], [32, sh - 4]], { lw: 4, color: gold, seed: seed + 159 });
+      G.line(ctx, [[0, sh + 10], [0, hem]], { lw: 3, color: shade(robeCol, 0.72), seed: seed + 160 });
+      for (const sd of [-1, 1]) G.line(ctx, [[sd * 12, sh + 12], [sd * 14, hem]], { lw: 5, color: gold, seed: seed + 161 + sd });
+      for (let k = 0; k < 6; k++) G.ellipse(ctx, 0, sh + 30 + k * ((Math.min(hem, hip + 40) - sh - 40) / 6), 5, 5, { fill: gold, lw: 1.5, seed: seed + 164 + k, amp: 0.3 });
+      if (!seated) G.line(ctx, [[-94 * bw, hem - 8], [94 * bw, hem - 8]], { lw: 8, color: gold, seed: seed + 171 });
+      ctx.save(); ctx.beginPath(); G.path(ctx, torso); ctx.clip(); ctx.fillStyle = shade(gold, 1.05);
+      for (let k = 0; k < 34; k++) { const u = U.hash(seed, k, 5), v = U.hash(seed, k, 6); ctx.globalAlpha = 0.55; ctx.beginPath(); ctx.ellipse(-80 * bw + 160 * bw * u, sh + 20 + (hem - sh - 20) * v, 3.4, 5, 0.6, 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore();
+      for (const sd of [-1, 1]) G.line(ctx, [[sd * 28, sh + 40], [sd * 58 * bw, sh + 52], [sd * 34, sh + 70]], { lw: 3, color: gold, seed: seed + 172 + sd, step: 8 });
+    }
+    if (lehenga) {
+      // the choli: a round neckline and a hem worked in gold; the dupatta's end drapes across the front
+      G.ellipse(ctx, 0, sh + 4, 38, 20, { fill: st.skin, lw: 3.5, seed: seed + 173 });
+      const nk = []; for (let k = 0; k <= 12; k++) { const a = Math.PI * (k / 12); nk.push([Math.cos(a) * 42, sh + 4 + Math.sin(a) * 24]); }
+      G.line(ctx, nk, { lw: 5, color: gold, seed: seed + 174, step: 6 });
+      if (!seated) G.line(ctx, [[-72 * bw, hip - 26], [72 * bw, hip - 26]], { lw: 6, color: gold, seed: seed + 176 });
+      if (st.headwear === 'dupatta' && !seated) {
+        const dc = st.headwearColor || robeCol;
+        ctx.save(); ctx.globalAlpha *= 0.82;
+        G.poly(ctx, [[-80 * bw, sh - 6], [-36 * bw, sh - 12], [80 * bw, hip - 44], [74 * bw, hip + 18], [40 * bw, hip + 10]], { fill: dc, lw: 3.5, seed: seed + 178, step: 18, hatch: { color: 'rgba(0,0,0,0.1)', gap: 9 } });
+        ctx.restore();
+        G.line(ctx, [[-36 * bw, sh - 12], [80 * bw, hip - 44]], { lw: 5, color: gold, seed: seed + 179 });
+        G.line(ctx, [[-80 * bw, sh - 6], [40 * bw, hip + 10]], { lw: 5, color: gold, seed: seed + 180 });
+      }
     }
     if (outfit === 'sari') {
       // the pallu: over the blouse from the right hip to the left shoulder, with a gold border
@@ -360,17 +414,25 @@
       if (sleeves === 'short') {
         const sx2 = S[0] + (a.E[0] - S[0]) * 0.42, sy2 = S[1] + (a.E[1] - S[1]) * 0.42;
         G.limb(ctx, [[S[0] - sd * 4, S[1] - 6], [sx2, sy2]], { color: st.shirt, lw: 36, seed: seed + 15 + sd });
+      } else if (sleeves === 'elbow') {
+        G.limb(ctx, [[S[0] - sd * 4, S[1] - 6], a.E], { color: st.shirt, lw: 34, seed: seed + 15 + sd });
+        G.ellipse(ctx, a.E[0], a.E[1], 15, 15, { fill: gold, lw: 2.5, seed: seed + 181 + sd, amp: 0.4 });
       } else if (sleeves === 'long') {
         const wx = a.E[0] + (a.H[0] - a.E[0]) * 0.78, wy = a.E[1] + (a.H[1] - a.E[1]) * 0.78;
         const sc = suit ? robeCol : st.shirt;
         G.limb(ctx, [[S[0] - sd * 4, S[1] - 6], a.E, [wx, wy]], { color: isDark(sc) ? shade(sc, 1.45) : sc, lw: outfit === 'abaya' ? 44 : 34, seed: seed + 15 + sd });
       }
+      if (sleeves === 'long' && sherwani) { const wx = a.E[0] + (a.H[0] - a.E[0]) * 0.74, wy = a.E[1] + (a.H[1] - a.E[1]) * 0.74; G.ellipse(ctx, wx, wy, 19, 19, { fill: gold, lw: 3, seed: seed + 175 + sd }); }
+      if (st.bangles) { const bx = a.E[0] + (a.H[0] - a.E[0]) * 0.8, by = a.E[1] + (a.H[1] - a.E[1]) * 0.8; for (let k = 0; k < 3; k++) G.ellipse(ctx, bx + (a.H[0] - a.E[0]) * 0.035 * k, by + (a.H[1] - a.E[1]) * 0.035 * k, 17, 17, { fill: null, stroke: k === 1 ? gold : st.bangles, lw: 4, seed: seed + 177 + k + sd * 3, amp: 0.3 }); }
       G.ellipse(ctx, a.H[0], a.H[1], 20, 20, { fill: st.skin, lw: 4, seed: seed + 17 + sd });
+      if (st.mehndi) { ctx.save(); ctx.strokeStyle = '#8A3B1A'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(a.H[0], a.H[1], 8, 0, Math.PI * 2); ctx.stroke(); for (let k = 0; k < 6; k++) { const an = (k / 6) * Math.PI * 2; ctx.beginPath(); ctx.arc(a.H[0] + Math.cos(an) * 13, a.H[1] + Math.sin(an) * 13, 2, 0, Math.PI * 2); ctx.stroke(); } ctx.restore(); }
       Ch.gestureProp(ctx, gesture, sd, S, a, { seed, skin: st.skin });
     };
+    if (gesture === 'dhol') Ch.dholDrum(ctx, hip, bw, seed);
     // neck
     G.rrect(ctx, -20, sh - 24, 40, 30, 8, { fill: st.skinDark, lw: 3.5, seed: seed + 19 });
     if (scarf) Ch.scarf(ctx, -96, sh - 34, 192, 0.05 * Math.sin(G.t * 2), seed + 60);
+    if (st.garland) Ch.garland(ctx, sh, bw, st.garland, seed);
 
     // ---- head ----
     ctx.save();
@@ -395,6 +457,13 @@
       G.poly(ctx, [[48, -62], [86, -52], [106, -12], [102, 48], [84, 94], [74, 42], [68, -8]], { fill: st.hair, lw: 4, seed: seed + 90, step: 14 });
       G.rrect(ctx, 60, -56, 22, 16, 5, { fill: C.kit, lw: 2.5, seed: seed + 91 });
     }
+    if (st.headwear === 'dupatta') {
+      const dc = st.headwearColor || robeCol;
+      ctx.save(); ctx.globalAlpha *= 0.9;
+      G.poly(ctx, [[-84, -34], [-74, -90], [0, -108], [74, -90], [84, -34], [100, 80], [118, 250], [76, 262], [64, 130], [-64, 130], [-76, 262], [-118, 250], [-100, 80]], { fill: dc, lw: 4, seed: seed + 93, step: 18, hatch: { color: 'rgba(0,0,0,0.1)', gap: 9 } });
+      ctx.restore();
+      for (const sd of [-1, 1]) G.line(ctx, [[sd * 84, -34], [sd * 100, 80], [sd * 118, 250]], { lw: 6, color: gold, seed: seed + 94 + sd });
+    }
     if (st.headwear === 'ghutra') {
       G.poly(ctx, [[-82, -30], [-60, -84], [0, -100], [60, -84], [82, -30], [92, 60], [104, 130], [0, 150], [-104, 130], [-92, 60]], { fill: st.headwearColor || '#F5F3EE', lw: 4, seed: seed + 92, step: 18, hatch: { color: 'rgba(0,0,0,0.08)', gap: 8 } });
     }
@@ -402,7 +471,7 @@
       G.poly(ctx, [[-80, -10], [-72, -62], [-40, -94], [0, -102], [40, -94], [72, -62], [80, -10], [86, 60], [100, 124], [62, 146], [0, 154], [-62, 146], [-100, 124], [-86, 60]], { fill: st.hijab, lw: 4, seed: seed + 90, step: 18, hatch: { color: 'rgba(0,0,0,0.12)', gap: 8 } });
     }
     // ears
-    if (hs !== 'hijab' && st.headwear !== 'ghutra') {
+    if (hs !== 'hijab' && st.headwear !== 'ghutra' && st.headwear !== 'dupatta') {
       G.ellipse(ctx, -64, 6, 14, 18, { fill: st.skin, lw: 3.5, seed: seed + 21 });
       G.ellipse(ctx, 64, 6, 14, 18, { fill: st.skin, lw: 3.5, seed: seed + 22 });
     }
@@ -481,6 +550,16 @@
         if (h > 6) { ctx.fillStyle = '#FFF'; ctx.beginPath(); ctx.arc(cx - w * 0.18, cy - h * 0.2, wide ? 3.2 : 2.4, 0, Math.PI * 2); ctx.fill(); }
       }
     }
+    // glasses: bold = big rectangular optical frames with thick rims (the Beckham look)
+    if (st.glasses === 'bold') {
+      const gx = look * 10, frame = st.glassesColor || '#231F1C';
+      for (const sd of [-1, 1]) {
+        G.rrect(ctx, sd * 29 + gx - 25, -27, 50, 38, 9, { fill: 'rgba(225,238,255,0.16)', lw: 6.5, stroke: frame, seed: seed + 125 + sd, second: false });
+        G.line(ctx, [[sd * 29 + gx - 15, -18], [sd * 29 + gx - 5, -24]], { lw: 3, color: 'rgba(255,255,255,0.55)', seed: seed + 131 + sd });
+        G.line(ctx, [[sd * 54 + gx, -14], [sd * 64, -8]], { lw: 5, color: frame, seed: seed + 128 + sd });
+      }
+      G.line(ctx, [[-5 + gx, -13], [5 + gx, -13]], { lw: 5, color: frame, seed: seed + 130 });
+    }
     // glasses
     if (st.glasses === 'round' || st.glasses === 'square' || st.glasses === 'sun') {
       const gx = look * 10;
@@ -499,6 +578,21 @@
     }
     // nose
     G.line(ctx, [[-2 + look * 6, 8], [6 + look * 6, 20], [-4 + look * 6, 24]], { lw: 3.5, seed: seed + 35, color: st.skinDark });
+    // bridal jewellery: a maang tikka on the parting, jhumka earrings, a nath (nose ring) with its chain
+    if (st.jewelry) {
+      G.line(ctx, [[0, -84], [0, -58]], { lw: 2.5, color: gold, seed: seed + 132 });
+      G.ellipse(ctx, 0, -50, 10, 10, { fill: gold, lw: 2, seed: seed + 133, amp: 0.4 });
+      G.ellipse(ctx, 0, -50, 4.5, 4.5, { fill: '#C2183A', lw: 0, seed: seed + 134, amp: 0.2 });
+      for (const sd of [-1, 1]) {
+        G.ellipse(ctx, sd * 62, 22, 6, 6, { fill: gold, lw: 2, seed: seed + 135 + sd, amp: 0.3 });
+        G.poly(ctx, [[sd * 62 - 9, 30], [sd * 62 + 9, 30], [sd * 62 + 13, 48], [sd * 62 - 13, 48]], { fill: gold, lw: 2, seed: seed + 137 + sd, step: 8 });
+        for (let k = -1; k <= 1; k++) G.ellipse(ctx, sd * 62 + k * 8, 53, 2.5, 2.5, { fill: '#F4EEE0', lw: 1, seed: seed + 139 + k, amp: 0.2 });
+      }
+      ctx.save(); ctx.strokeStyle = gold; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(-11 + look * 6, 24, 10, -0.4, Math.PI * 1.5); ctx.stroke();
+      ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(-20 + look * 6, 24); ctx.quadraticCurveTo(-46, 36, -60, 20); ctx.stroke();
+      ctx.restore();
+    }
     // cheeks
     if (blush > 0) {
       ctx.save();
@@ -584,7 +678,7 @@
   // ---- gestures: where the hands go (sh = shoulder line, hip = hip line, in the person's own units) ----
   // wave · point · pointUp · thumbsUp · phone · typing · cheer · shrug · facepalm · think · clap · akimbo ·
   // dua (hands raised, palms up) · mic (holding a microphone) · bat (a cricket batting stance)
-  Ch.GESTURES = ['wave', 'point', 'pointUp', 'thumbsUp', 'phone', 'typing', 'cheer', 'shrug', 'facepalm', 'think', 'clap', 'akimbo', 'dua', 'mic', 'bat'];
+  Ch.GESTURES = ['wave', 'point', 'pointUp', 'thumbsUp', 'phone', 'typing', 'cheer', 'shrug', 'facepalm', 'think', 'clap', 'akimbo', 'dua', 'mic', 'bat', 'bhangra', 'dhol', 'adab'];
   Ch.gestureHands = (g, { sh, hip, t }) => {
     switch (g) {
       case 'wave': return { R: [150 + Math.sin(t * 9) * 28, sh - 120] };
@@ -602,6 +696,9 @@
       case 'dua': return { L: [-52, sh + 34], R: [52, sh + 34] };
       case 'mic': return { R: [34, sh - 30] };
       case 'bat': return { L: [66, hip - 28], R: [80, hip - 58] };
+      case 'bhangra': { const b = Math.sin(t * 7.5); return { L: [-150 + 16 * b, sh - 150 - 34 * Math.max(0, b)], R: [150 + 16 * b, sh - 150 - 34 * Math.max(0, -b)] }; }
+      case 'dhol': return { L: [-112, hip - 52 + 10 * Math.sin(t * 13)], R: [104, hip - 70 - 26 * Math.abs(Math.sin(t * 9))] };
+      case 'adab': return { R: [36, sh - 120] };
       default: return {};
     }
   };
@@ -620,6 +717,10 @@
     } else if (sd > 0 && g === 'mic') {
       G.limb(ctx, [[hx + 2, hy + 12], [hx + 6, hy + 46]], { color: '#2A2A30', lw: 12, outline: 3, seed: seed + 194 });
       G.ellipse(ctx, hx - 2, hy - 18, 15, 17, { fill: '#55535E', lw: 3.5, seed: seed + 195, hatch: { color: 'rgba(255,255,255,0.25)', gap: 4 } });
+    } else if (g === 'dhol') {
+      // the sticks: a curved one (dagga) on the bass head, a thin cane (tilli) on the treble head
+      if (sd < 0) G.line(ctx, [[hx, hy], [hx - 16, hy + 26], [hx - 8, hy + 50]], { color: '#5A3A28', lw: 7, seed: seed + 198 });
+      else G.line(ctx, [[hx, hy], [hx + 30, hy + 34]], { color: '#8E6444', lw: 4, seed: seed + 199 });
     } else if (sd > 0 && g === 'bat') {
       // a cricket bat held down and to the side: handle in the hands, blade toward the ground
       ctx.save(); ctx.translate(hx - 4, hy + 10); ctx.rotate(-0.35);
@@ -643,10 +744,106 @@
       const c = col || '#E8E1CF';
       G.shape(ctx, [[-72, -20], [-74, -62], [-48, -100], [0, -114], [48, -100], [74, -62], [72, -20], [0, -34]], { fill: c, lw: 4, seed: seed + 200 });
       for (let k = 0; k < 4; k++) G.line(ctx, [[-66 + k * 8, -30 - k * 20], [0, -46 - k * 18], [66 - k * 8, -64 - k * 12]], { lw: 3, color: shade(c, 0.78), seed: seed + 204 + k });
+    } else if (hw === 'pagri') {
+      // the groom's turban: a starched fan (turra) standing up on one side, wrapped folds, a jewelled kalgi
+      const c = col || '#E6C170', g2 = '#D4A83A';
+      for (let k = 0; k < 6; k++) {
+        const a0 = -2.3 + k * 0.22, a1 = a0 + 0.22;
+        G.poly(ctx, [[36, -92], [36 + Math.cos(a0) * 86, -92 + Math.sin(a0) * 86], [36 + Math.cos(a1) * 86, -92 + Math.sin(a1) * 86]], { fill: k % 2 ? c : shade(c, 0.86), lw: 3, seed: seed + 206 + k, step: 20 });
+      }
+      G.shape(ctx, [[-74, -22], [-78, -66], [-52, -106], [0, -118], [52, -106], [78, -66], [74, -22], [0, -36]], { fill: c, lw: 4, seed: seed + 200, hatch: { color: 'rgba(140,90,20,0.14)', gap: 6 } });
+      for (let k = 0; k < 4; k++) G.line(ctx, [[-70 + k * 6, -32 - k * 19], [4, -52 - k * 17], [72 - k * 8, -40 - k * 18]], { lw: 3, color: shade(c, 0.74), seed: seed + 212 + k });
+      G.line(ctx, [[-74, -24], [0, -38], [74, -24]], { lw: 5, color: g2, seed: seed + 216 });
+      G.line(ctx, [[2, -88], [8, -124], [22, -146]], { lw: 5, color: '#F6F2EA', seed: seed + 217 });
+      G.ellipse(ctx, 2, -78, 13, 13, { fill: '#C2183A', stroke: g2, lw: 4, seed: seed + 218 });
+      if (st.sehra) {
+        // the sehra: strings of jasmine and roses hanging from the rim, framing the face; a short fringe on the forehead
+        for (const sd of [-1, 1]) for (let k = 0; k < 6; k++) {
+          const sx = sd * (46 + k * 8), y1 = 96 + k * 14;
+          G.line(ctx, [[sx, -30], [sx + sd * 4, y1]], { lw: 1.5, color: 'rgba(90,70,40,0.6)', seed: seed + 220 + k });
+          for (let y2 = -22, q = 0; y2 < y1; y2 += 12, q++) { ctx.fillStyle = (q + k) % 3 === 0 ? '#D81E3A' : '#FBF7EE'; ctx.beginPath(); ctx.arc(sx + sd * 4 * ((y2 + 30) / (y1 + 30)), y2, 5.2, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = 'rgba(60,40,30,0.5)'; ctx.lineWidth = 1; ctx.stroke(); }
+        }
+        for (let xk = -38; xk <= 38; xk += 8) for (let y2 = -30; y2 < -12; y2 += 9) { ctx.fillStyle = y2 > -20 ? '#D4A83A' : '#FBF7EE'; ctx.beginPath(); ctx.arc(xk, y2, 3.4, 0, Math.PI * 2); ctx.fill(); }
+      }
+    } else if (hw === 'dupatta') {
+      // the dupatta over the head: a soft band from ear to ear with a gold edge (its long ends hang behind)
+      const c = col || '#B0102A', band = [];
+      for (let i = 0; i <= 20; i++) { const a = (160 + (i / 20) * 220) * Math.PI / 180; band.push([Math.cos(a) * 82, 4 + Math.sin(a) * 94]); }
+      for (let i = 20; i >= 0; i--) { const a = (160 + (i / 20) * 220) * Math.PI / 180; band.push([Math.cos(a) * 68, 14 + Math.sin(a) * 80]); }
+      G.shape(ctx, band, { fill: c, lw: 4, seed: seed + 225, hatch: { color: 'rgba(0,0,0,0.1)', gap: 8 } });
+      const edge = []; for (let i = 0; i <= 20; i++) { const a = (160 + (i / 20) * 220) * Math.PI / 180; edge.push([Math.cos(a) * 70, 13 + Math.sin(a) * 82]); }
+      G.line(ctx, edge, { lw: 5, color: '#D4A83A', seed: seed + 226, step: 8 });
     } else if (hw === 'ghutra') {
       G.shape(ctx, [[-70, -18], [-66, -62], [-36, -90], [0, -96], [36, -90], [66, -62], [70, -18], [52, -40], [0, -54], [-52, -40]], { fill: col || '#F5F3EE', lw: 4, seed: seed + 200 });
       G.shape(ctx, [[-64, -52], [-36, -76], [0, -82], [36, -76], [64, -52], [58, -44], [0, -66], [-58, -44]], { fill: '#1E1C22', lw: 3, seed: seed + 205 });
     }
+  };
+  // a garland around the neck: 'flowers' (marigold with roses) · 'roses' · 'notes' (a money garland)
+  Ch.garland = (ctx, sh, bw, kind, seed = 1) => {
+    const n = 22, pts = [];
+    for (let i = 0; i <= n; i++) { const u = i / n, a = Math.PI * u; pts.push([-54 * bw * Math.cos(a) * (1 - 0.15 * Math.sin(a)), sh + 2 + 178 * Math.pow(Math.sin(a), 0.85)]); }
+    pts.forEach(([px, py], i) => {
+      if (kind === 'notes') {
+        const q = pts[Math.min(n, i + 1)], p0 = pts[Math.max(0, i - 1)], an = Math.atan2(q[1] - p0[1], q[0] - p0[0]);
+        ctx.save(); ctx.translate(px, py); ctx.rotate(an + 0.4);
+        G.rrect(ctx, -13, -8, 26, 16, 2, { fill: ['#3E8A5A', '#C9463D', '#3D5FA8'][i % 3], lw: 2, seed: seed + 240 + i, amp: 0.3 });
+        ctx.restore();
+      } else {
+        const rose = kind === 'roses' || i % 4 === 0;
+        G.ellipse(ctx, px, py, 13, 12, { fill: rose ? '#D81E3A' : i % 2 ? '#F2A516' : '#F7C93A', lw: 2.5, seed: seed + 240 + i, amp: 0.6 });
+        ctx.save(); ctx.fillStyle = rose ? '#8E1024' : '#C46A10'; ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      }
+    });
+  };
+  // a dhol slung across the belly (drawn before the arms, so the hands hold the sticks in front of it)
+  Ch.dholDrum = (ctx, hip, bw, seed = 1) => {
+    const y0 = hip - 60, w = 118 * bw;
+    G.line(ctx, [[-60, hip - 190], [w * 0.6, y0 - 40]], { lw: 6, color: '#7A1F1A', seed: seed + 250 }); // the strap
+    G.rrect(ctx, -w, y0 - 52, 2 * w, 104, 40, { fill: '#B5703A', lw: 4.5, seed: seed + 251, hatch: { color: 'rgba(80,40,10,0.2)', gap: 8 } });
+    for (let k = 0; k < 7; k++) G.line(ctx, [[-w + 20 + k * ((2 * w - 40) / 7), y0 - 50], [-w + 20 + (k + 0.5) * ((2 * w - 40) / 7), y0 + 50]], { lw: 2.5, color: '#F4E6C8', seed: seed + 252 + k });
+    for (const sd of [-1, 1]) G.ellipse(ctx, sd * w, y0, 18, 54, { fill: '#EAD9B8', lw: 4, seed: seed + 260 + sd });
+  };
+  // a horse in side view (facing right; facing: -1 flips it), decorated for a baraat: an embroidered saddle
+  // cloth (jhool), a plume, a garland and gold beads. walk = the leg phase (0..1). Returns { seat: [x, y] }
+  // for a rider: Ch.person(ctx, { x: seat[0], y: seat[1], pose: 'sit', … })
+  Ch.horse = (ctx, o) => {
+    const { x, y, s = 1, walk = 0, facing = 1, color = '#F6F2EA', mane = '#E4DACB', decorated = true, cloth = '#B0102A', seed = 820, shadow = true } = o;
+    const ph = 2 * Math.PI * walk, bob = Math.abs(Math.sin(ph)) * 6;
+    ctx.save(); ctx.translate(x, y);
+    if (shadow) { ctx.fillStyle = 'rgba(20,10,20,0.22)'; ctx.beginPath(); ctx.ellipse(0, 4, 190 * s, 18 * s, 0, 0, Math.PI * 2); ctx.fill(); }
+    ctx.scale(s * facing, s); ctx.translate(0, -bob);
+    const leg = (hx, phase, near) => {
+      const a = ph + phase, lift = Math.max(0, Math.sin(a)), sw = Math.cos(a) * 24;
+      const hoof = [hx + sw, -10 - lift * 28 + bob];
+      G.limb(ctx, [[hx, -150], [hx + sw * 0.5 + 6, -84 - lift * 18 + bob * 0.5], hoof], { color: near ? color : shade(color, 0.84), lw: 26, seed: seed + (near ? 1 : 3) + hx });
+      G.rrect(ctx, hoof[0] - 15, hoof[1] - 5, 30, 14, 4, { fill: '#3A3230', lw: 2.5, seed: seed + 5 + hx });
+    };
+    leg(-96, Math.PI * 0.5, false); leg(96, Math.PI * 1.5, false);
+    G.limb(ctx, [[-150, -206], [-190, -150], [-196, -84]], { color: mane, lw: 30, seed: seed + 7 });
+    G.ellipse(ctx, 0, -200, 184, 86, { fill: color, lw: 5, seed: seed + 8, hatch: { color: 'rgba(120,100,80,0.1)', gap: 9 } });
+    G.poly(ctx, [[96, -250], [146, -340], [190, -374], [230, -350], [206, -280], [170, -176]], { fill: color, lw: 5, seed: seed + 9, step: 20 });
+    for (let k = 0; k < 6; k++) G.ellipse(ctx, 118 + k * 13, -250 - k * 20, 13, 17, { fill: mane, lw: 3, seed: seed + 10 + k, amp: 0.8 });
+    ctx.save(); ctx.translate(222, -354); ctx.rotate(0.6);
+    G.rrect(ctx, -24, -30, 122, 62, 30, { fill: color, lw: 5, seed: seed + 16 });
+    G.ellipse(ctx, 88, 10, 7, 5, { fill: '#6B5A50', lw: 1.5, seed: seed + 17 });
+    ctx.restore();
+    G.poly(ctx, [[196, -380], [206, -418], [222, -384]], { fill: color, lw: 4, seed: seed + 18, step: 10 });
+    ctx.fillStyle = '#2A2320'; ctx.beginPath(); ctx.ellipse(232, -358, 7, 8, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#FFF'; ctx.beginPath(); ctx.arc(230, -361, 2.2, 0, Math.PI * 2); ctx.fill();
+    leg(-72, Math.PI * 1.5, true); leg(120, Math.PI * 0.5, true);
+    if (decorated) {
+      const g2 = '#D4A83A', hem = [];
+      for (let k = 0; k <= 10; k++) hem.push([100 - k * 20, -146 + (k % 2) * 12]);
+      G.shape(ctx, [[-96, -256], [84, -262], ...hem], { fill: cloth, lw: 4, seed: seed + 20, hatch: { color: 'rgba(0,0,0,0.12)', gap: 8 } });
+      G.line(ctx, [[-90, -168], [96, -168]], { lw: 6, color: g2, seed: seed + 21 });
+      for (let k = 0; k < 8; k++) G.ellipse(ctx, -76 + k * 22, -214, 6, 6, { fill: g2, lw: 1.5, seed: seed + 22 + k, amp: 0.3 });
+      G.rrect(ctx, -60, -286, 118, 36, 14, { fill: '#6B2A1E', lw: 4, seed: seed + 30 });
+      for (let k = 0; k < 6; k++) G.ellipse(ctx, 176 + k * 9, -330 + k * 13, 7, 7, { fill: k % 2 ? '#F2A516' : '#D81E3A', lw: 2, seed: seed + 31 + k, amp: 0.4 });
+      for (let k = 0; k < 5; k++) G.line(ctx, [[204, -386], [204 + (k - 2) * 12, -440 - (k % 2) * 12]], { lw: 5, color: ['#D81E3A', '#F2A516', '#3FA89B', '#F2A516', '#D81E3A'][k], seed: seed + 40 + k });
+      G.line(ctx, [[196, -350], [262, -318]], { lw: 3, color: g2, seed: seed + 46 });
+    }
+    ctx.restore();
+    return { seat: [x + facing * -2 * s, y - (282 + bob) * s] };
   };
   // walking across the frame: where a walker is at t, and the leg phase to pass as `walk`
   // (stride = the distance of one full cycle, in pixels at s = 1)

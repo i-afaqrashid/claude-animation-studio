@@ -6,6 +6,7 @@
 //   node <skill>/scripts/new-project.js <target-dir> --from qawwali-night  -> 16:9 qawwali: tempo map, singers, harmonium, tabla, Urdu captions
 //   node <skill>/scripts/new-project.js <target-dir> --from gully-cricket  -> 9:16 comic escalation: TTS commentary, lip-sync, shots, SFX
 //   node <skill>/scripts/new-project.js <target-dir> --from birthday-card  -> 1:1 watercolour card: Happy Birthday sung with a NAME
+//   node <skill>/scripts/new-project.js <target-dir> --from wedding-invite -> 9:16 (any format) shaadi card: shehnai, dhol, baraat, the three events
 //   node <skill>/scripts/new-project.js <target-dir> --from lyric-video    -> 9:16 lyric video on an analysed song (analyze → beats.js)
 //   node <skill>/scripts/new-project.js <target-dir> --from product-launch -> 16:9 launch: voiceover, captions, counters, style + genre montage
 //   node <skill>/scripts/new-project.js <target-dir> --from world-cup-2026 -> re-render/remix the 58s reference film (older API)

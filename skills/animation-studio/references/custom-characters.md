@@ -21,12 +21,12 @@ All fields are optional; defaults draw the original jersey look.
 | `hairStyle` | `quiff` (default), `short`, `buzz`, `curlytop`, `long`, `curly` (big curls), `bun`, `ponytail`, `bald`, `hijab` |
 | `hijab` | hijab colour |
 | `facialHair` | `none`, `stubble`, `mustache`, `trimmed` (short beard + mustache), `beard` |
-| `glasses`, `glassesColor` | `none`, `round`, `square`, `sun` (round sunglasses, gold frames by default) |
+| `glasses`, `glassesColor` | `none`, `round`, `square`, `bold` (big rectangular optical frames with thick rims, the Beckham look), `sun` (round sunglasses, gold frames by default) |
 | `outfit` | `jersey` (side panels, `name` + `number`), `tee`, `hoodie`, `shirt` (collar, buttons, pocket), `dress`, `kameez` (long shirt to the knees) |
 | `shirt`, `trim`, `collar` | outfit colours (dark fabrics get light seams automatically) |
 | `bottoms`, `shorts` | `shorts`, `pants`, `shalwar` (loose trousers), `skirt`; `shorts` is the bottoms colour |
 | `sleeves` | `short`, `long`, `none` (default depends on the outfit) |
-| `build` | `slim`, `regular`, `broad` |
+| `build` | `slim`, `regular`, `broad`, `heavy` |
 | `print`, `printColor` | big text on a tee or hoodie |
 | `freckles`, `shoes`, `name`, `number` | as named |
 
@@ -42,8 +42,15 @@ When personalizing for a real viewer, ask for (or read from a photo they share) 
 - **Lip-sync:** `mouth: Subs.mouth(VO, t, 'dad')`, where VO is `out/voice.json` from the voiceover. The mouth opens with the voice's loudness and widens on bright vowels. Works on `Ch.claude` too.
 - **Outfits:** `outfit: 'thobe'` (white robe to the ankles; add `headwear: 'ghutra'`), `'abaya'` (long black robe, wide sleeves; pair with `hairStyle: 'hijab'`), `'sari'` (wrap skirt + pallu over the shoulder; `robe` = sari colour, `shirt` = blouse, `trim` = border, gold by default), `'suit'` (jacket with lapels + tie; `robe` = jacket, `trim` = tie). Set a robe's colour with `style.robe`.
 - **Headwear:** `headwear: 'topi'` (prayer cap), `'cap'` (baseball cap, `headwearColor`), `'turban'`, `'ghutra'` (headscarf with a black agal).
+- **Weddings (v1.1):**
+  - The groom: `outfit: 'sherwani'` is a long coat to the knees with a bandhgala collar, gold buttons, embroidery and cuffs (`robe` = the coat, `trim` = the gold). Pair it with `headwear: 'pagri'` (a turban with a starched turra fan and a jewelled kalgi; `headwearColor`). `sehra: true` hangs a veil of jasmine and roses from the pagri.
+  - The bride: `outfit: 'lehenga'` is a flared skirt to the ground with gold bands, and a choli (`robe` = the skirt, `shirt` = the choli). Add `headwear: 'dupatta'` (a drape over the head and across the front; `headwearColor`), `jewelry: true` (maang tikka, jhumkas, nath), `bangles: '<colour>'` and `mehndi: true` (henna on the hands).
+  - `garland: 'flowers'` (marigold and roses), `'roses'` or `'notes'` (a money garland) goes on anyone. `Ch.garland(ctx, sh, bw, kind, seed)` draws one on your own characters.
+  - Gestures `bhangra` (animated), `dhol` (a dhol slung across the belly, played with both sticks; `Ch.dholDrum` draws the drum alone) and `adab` (a hand raised in greeting).
+  - `Ch.horse(ctx, { x, y, s, walk, facing, color, mane, decorated, cloth, seed, shadow })` draws a baraat horse in side view with an embroidered saddle cloth, a plume and beads. It returns `{ seat: [x, y] }`, so the rider is `Ch.person(ctx, { x: seat[0], y: seat[1], pose: 'sit', … })`.
+  - The `wedding-invite` starter uses all of these.
 - **Animals:** `Ch.dog` (sit/stand, a tail that wags faster when `happy`, `bark`), `Ch.cat` (swaying tail, `meow`), `Ch.bird` (`flap`, `sing`, `facing`).
-- Dress people as the audience would expect: a grandfather in a kameez and topi, a bride in a red sari, office staff in suits. Show the brief's own culture with care, and avoid caricature.
+- Dress people as the audience would expect: a grandfather in a kameez and topi, a bride in a red sari or lehenga, office staff in suits. Show the brief's own culture with care, and avoid caricature.
 
 ## 3. Building a new character from primitives
 

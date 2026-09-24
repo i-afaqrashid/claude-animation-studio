@@ -35,6 +35,17 @@ The Sitey promo recipe (104 BPM, D major pentatonic):
 - **Notifications**: `I.ting(midi)` pitched up the pentatonic scale, faster and faster, makes a comic "flood" of messages.
 Checked by measurement: the tabla `na` lands within 2 Hz of its note, the harmonium within ±5 cents, and the dholak `ghe` falls from ~130 to ~70 Hz.
 
+### Shaadi (shehnai, dhol, ghungroo): the `wedding-invite` recipe
+108 BPM, a drone on Sa (D) from the first note to the last, and a shehnai tune in a Yaman colour (D E F# G# A B C#).
+- **Shehnai:** each phrase is ONE `I.shehnaiLine` (notes less than 0.12 s apart join the line), so it glides like a real reed. Add `kan: 2` on the long notes of the tune. It leads the mix, with a hall reverb send (0.2) and a dotted-8th echo (0.05).
+- **One groove per ceremony:**
+  - Mehndi: a dholak groove `G..N.KN.G.N.NKN.` (G = ghe, N = na, K = ka), with taali on 2 and 4.
+  - Baraat: the dhol chaal `B.t.tD.tB.t.tD.t` (B = both 0.95, D = dagga 0.8, t = tilli 0.45), a brass band doubling the shehnai an octave down, hooves (`woodTick`) on the 8ths, and fireworks on the big beats.
+  - Walima: soft tabla (`dha` on 1, `tin` after), strings on the chords, and a chandelier sparkle (`bell`) on every shehnai note.
+- **The drop:** a dhol roll up the build (dagga and tilli alternating, getting louder), then an 8th of held breath (`MIX.gate`). Then a `dhol('both')` + `subBoom` + crash, and six formant voices singing "shaa-di mu-baa-rak!", with a crowd cheering under it.
+- **Ghungroo** shimmer through the opening alaap and on the doors, and a last chord with bells on the save-the-date.
+- Keep the bass to short plucks on beats 1 and 3: the dholak `ghe` and the dhol `dagga` already carry the low end.
+
 ### Crowd and choir (formant synthesis)
 - **Chant ("o-lé")**: for each hook note, 12 tenors (an octave down) + 7 altos (at pitch), each with a random detune of ±0.17 semitones, 0–35ms lag, random pan, and syllables alternating `o` / `le`. Gain about 0.05 each, plus its own large reverb.
 - **Crowd babble**: Poisson-spawn shouts (0.35–1.35s, random vowel, pitch 47–60 or +12 for altos, glide ±, breath 0.18, shout 1.3). Use about 7/s during a match, a rising 4 → 26/s during a build, and a burst of about 55 long rising "yeaaah" voices on the goal.

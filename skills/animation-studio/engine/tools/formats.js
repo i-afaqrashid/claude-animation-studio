@@ -1,4 +1,4 @@
-// node engine/render.js formats 16:9,9:16[,1:1,4:5] [workers] [--draft]
+// node engine/render.js formats 16:9,9:16[,1:1,4:5] [workers] [--draft | --res 1440]
 //   -> out/<name>-16x9.mp4, out/<name>-9x16.mp4 … : one score, every format, each verified and muxed.
 // Works for films that lay themselves out (score.js uses `const FORMAT = U.pickFormat('…')` and film.js draws
 // from G.W / G.H / G.SAFE). The music is shared: run node song.js once before.
@@ -18,11 +18,11 @@ module.exports = async function formats(C, _mode, args) {
   });
   const made = [];
   for (const f of list) {
-    const extra = C.DRAFT ? ['--draft'] : [];
+    const extra = C.DRAFT ? ['--draft'] : C.RES ? ['--res', String(C.RES)] : [];
     console.log(`▶ ${f}`);
     await run(['video', ...(workers ? [workers] : []), '--format', f, ...extra]);
     await run(['mux', '--format', f, ...extra]);
-    made.push(path.join(OUT, `${path.basename(ROOT)}-${f.replace(':', 'x')}${C.DRAFT ? '-draft' : ''}.mp4`));
+    made.push(path.join(OUT, `${path.basename(ROOT)}-${f.replace(':', 'x')}${C.RES && !C.DRAFT ? `-${C.RES}p` : ''}${C.DRAFT ? '-draft' : ''}.mp4`));
   }
   console.log(`done: ${made.map((m) => 'out/' + path.basename(m)).join(', ')}`);
 };

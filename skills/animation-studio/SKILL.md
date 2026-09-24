@@ -35,7 +35,7 @@ From the request, or with at most one round of questions, settle:
 - whether there is a voice (a voiceover, singing, or the user's own song),
 - where it will be posted: 16:9 for YouTube/X, **9:16 for Reels, TikTok and Shorts**, 1:1 or 4:5 for feeds. Ask if a brand or social brief doesn't say.
 
-Characters are never fixed. Use a preset (`Ch.STYLES.afaq`), customize `Ch.person` (hair, beard, glasses, outfits from jersey to sari, thobe or suit, headwear, build, colours), add `Ch.dog` / `Ch.cat` / `Ch.bird`, or build new characters from `G.*` primitives. When the user shares a photo of someone, translate it into `style` options and never store the photo. Their own images can appear as taped prints (`G.photo`) or a Ken Burns pan (`G.kenBurns`). See `references/custom-characters.md`.
+Characters are never fixed. Use a preset (`Ch.STYLES.afaq`), customize `Ch.person` (hair, beard, glasses, outfits from jersey to sari, thobe, suit, sherwani or lehenga, headwear, build, colours), add `Ch.dog` / `Ch.cat` / `Ch.bird`, or build new characters from `G.*` primitives. When the user shares a photo of someone, translate it into `style` options and never store the photo. Their own images can appear as taped prints (`G.photo`) or a Ken Burns pan (`G.kenBurns`). See `references/custom-characters.md`.
 
 ### 1. Choose a story shape, then storyboard it as music
 
@@ -67,6 +67,7 @@ Pick the starter that fits (details in `references/starters.md`):
 - **qawwali-night**, 16:9: a performance, with singing and a tempo that speeds up.
 - **gully-cricket**, 9:16: a comic escalation with dialogue.
 - **birthday-card**, 1:1: a sung name.
+- **wedding-invite**, 9:16 (lays itself out for every format): a shaadi card with a shehnai, the dhol, a baraat on a horse, and the Mehndi, Baraat and Walima details.
 - **lyric-video**, 9:16: the user's own song.
 
 Keep the starter's structure and replace the story. `world-cup-2026` uses an older API: read it for staging patterns only.
@@ -82,7 +83,7 @@ Name the key moments in `markers` (`drop: { t: ev.drop, sync: 'av' }`). Every co
 
 ### 4. Write `song.js` and measure it
 Render parts into buses, add reverb or delay sends, and sidechain the pads and bass to the kick in energetic sections. Then run `MIX.mixdown → highpass → gate (a silence, after the reverbs) → fadeOut → master → writeWav`. What the engine offers (recipes in `references/music-cookbook.md`):
-- **Instruments:** kit, bass, pads, brass, music box, marimba, guitar, e-piano, strings, pizzicato, timpani, 808, supersaw, chip waves, dholak, tabla, harmonium, and SFX (glass, scratch, whoosh, pop…).
+- **Instruments:** kit, bass, pads, brass, music box, marimba, guitar, e-piano, strings, pizzicato, timpani, 808, supersaw, chip waves, dholak, tabla, harmonium, shehnai, dhol, ghungroo, and SFX (glass, scratch, whoosh, pop…).
 - **Genre packs:** `Genre.play('lofi'|'chiptune'|'orchestral'|'edm'|'afrobeats'|'qawwali'|'desi'|'boombap', …)`, a full backing in one call. You write the hook.
 - **Voiceover:** `Voice.speak([{ at, text, voice, who, display, alt }])` does offline TTS with estimated word times and a mouth track (`out/voice.json`). Duck the music under it with `MIX.duck`.
 - **Singing:** `Sing.line('si-tey dot pee-kay', notes)` or `Sing.phrase(notes)`, and `Sing.happyBirthday(name)`, from a formant singer. It is best on short hooks, doubled by an instrument, with the words on screen.
@@ -102,7 +103,7 @@ Call `Studio.film({ draw(ctx, t) {...}, post, init })`. Every visual is a **pure
 
 The toolbox (every call is in `references/engine-api.md`):
 - **Looks:** `STYLE` `'paper'|'flat'|'pixel'|'chalk'|'neon'|'watercolor'` (or `--style` on any command), with `G.bg` for the background (visual-style.md).
-- **Acting:** poses `stand`, `sit`, `floor` (cross-legged) and `walk` (`Ch.walk`), 15 `gesture`s (wave, point, phone, cheer, clap, dua, mic, bat…), IK hand targets, and lip-sync with `mouth: Subs.mouth(VO, t, who)`.
+- **Acting:** poses `stand`, `sit`, `floor` (cross-legged) and `walk` (`Ch.walk`), 18 `gesture`s (wave, point, phone, cheer, clap, dua, mic, bat, bhangra, dhol…), IK hand targets, and lip-sync with `mouth: Subs.mouth(VO, t, who)`.
 - **Words:** `Subs.draw` captions (`pop`, `karaoke`, `box`, `clean`) from `Subs.fromVoice(VO)` or `SCORE.subtitles`. Urdu, Arabic and Hindi come out right in every text call.
 - **Products:** the UI kit (`UI.phone`, cards, chat, stats…) after `UI.setTheme`. `render.js snap https://site --full` + `UI.imageScreen` shows a real site scrolling in the phone. Use only facts the client confirms.
 - **Data:** `Data.counter` (`lakh: true` for Rs amounts), `Data.bars` / `line` / `donut`, and maps (`Data.map`, `drawMap`, `pin`, `route`) with Pakistan in detail.
@@ -153,7 +154,7 @@ cd <target-dir> && node engine/render.js verify     # sound ±20 ms and picture 
 For publishing, use:
 - `srt` for subtitle files,
 - `poster` for three thumbnails and a vertical cover,
-- `formats 16:9,9:16` for every format from one score,
+- `formats 16:9,9:16` for every format from one score (add `--res 2160` for a 4K master or `--res 1440` for 2K),
 - `mux --subs` for a soft subtitle track,
 - `clip … --gif` for a shareable GIF.
 
@@ -188,6 +189,6 @@ Report the output path, duration, resolution and size. Explain the sync gimmicks
 - **`scripts/test-audio.js`**: a fast audio regression test covering every instrument, genre, the singer and the loudness meter. Run it after touching `engine/audio`.
 - **`scripts/smoke-test.js`**: an end-to-end engine check covering render, mux, verify, the tools, voice, analyze, styles and every starter. Run it after changing the engine.
 - **`engine/render.js`** modes: `stills`, `sheet`, `board`, `clip [--gif]`, `preview`, `cast`, `video`, `mux [--subs]`, `check`, `verify`, `pacing`, `qa`, `plan`, `poster`, `srt`, `formats`, `brand`, `brand-from <url>`, `analyze <song>`, `snap <url>`.
-  - Flags: `--draft`, `--format 9:16`, `--style neon`.
+  - Flags: `--draft`, `--res 1440` (2K) or `--res 2160` (4K), `--format 9:16`, `--style neon`.
   - Times: seconds, `bar:beat` or `@marker±sec`.
 - **`engine/tools/levels.js`**: a per-section RMS and peak meter for the mix and stems

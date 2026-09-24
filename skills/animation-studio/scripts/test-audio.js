@@ -28,6 +28,7 @@ const mono = {
   musicBox: () => I.musicBox(m('A5')), marimba: () => I.marimba(m('A4')), dholak: () => I.dholak('ghe'), tabla: () => I.tabla('dha'), ting: () => I.ting(m('E6')),
   pulse: () => I.pulse(m('A4'), 0.3), triangle: () => I.triangle(m('A3'), 0.3), chipNoise: () => I.chipNoise('snare'), bass808: () => I.bass808(m('A1'), 0.6),
   pizz: () => I.pizz(m('A4')), glass: () => I.glass(), scratch: () => I.scratch(), timpani: () => I.timpani(m('A2')), logDrum: () => I.logDrum(m('A2')), rim: () => I.rim(),
+  shehnai: () => I.shehnai(m('A4'), 0.6), dholDagga: () => I.dhol('dagga'), dholTilli: () => I.dhol('tilli'), dholBoth: () => I.dhol('both'), ghungroo: () => I.ghungroo(1),
 };
 for (const [name, f] of Object.entries(mono)) { const x = f(); ok(`${name} renders`, x.length > 100 && finite(x) && peak(x) > 0.05 && peak(x) < 2.5, `peak ${peak(x).toFixed(2)}`); }
 for (const [name, f] of Object.entries({ padNote: () => I.padNote(m('A3'), 0.6), brassNote: () => I.brassNote(m('A3'), 0.5), harmonium: () => I.harmonium(m('A3'), 0.6) })) { const x = f(); ok(`${name} renders (stereo)`, finite(x.L) && finite(x.R) && peak(x.L) > 0.05 && peak(x.L) < 2.5, `peak ${peak(x.L).toFixed(2)}`); }
@@ -37,6 +38,8 @@ for (const [name, f] of Object.entries({ supersaw: () => I.supersaw(m('A3'), 0.5
 // tuning
 for (const n of ['E2', 'A3', 'E5']) { const f = acPitch(I.guitar(m(n), 1), 0.2, 6000, mtof(m(n))); ok(`guitar ${n} in tune`, Math.abs(cents(f, mtof(m(n)))) < 3, `${cents(f, mtof(m(n))).toFixed(2)} cents`); }
 for (const n of ['D3', 'A4']) { const h = I.harmonium(m(n), 1); const f = acPitch(h.L, 0.3, 6000, mtof(m(n))); ok(`harmonium ${n} in tune`, Math.abs(cents(f, mtof(m(n)))) < 8, `${cents(f, mtof(m(n))).toFixed(1)} cents`); }
+for (const n of ['D5', 'A5']) { const f = acPitch(I.shehnai(m(n), 1, { vib: 0 }), 0.5, 6000, mtof(m(n))); ok(`shehnai ${n} in tune`, Math.abs(cents(f, mtof(m(n)))) < 10, `${cents(f, mtof(m(n))).toFixed(1)} cents`); }
+{ const x = I.shehnaiLine([{ t: 0, dur: 0.5, midi: m('D5') }, { t: 0.5, dur: 0.6, midi: m('A5') }], { vib: 0 }); const f = acPitch(x, 0.85, 6000, mtof(m('A5'))); ok('shehnai line glides to its second note', Math.abs(cents(f, mtof(m('A5')))) < 10, `${cents(f, mtof(m('A5'))).toFixed(1)} cents`); }
 { const f = acPitch(I.tabla('na', { midi: m('D5') }), 0.05, 6000, mtof(m('D5'))); ok('tabla na in tune', Math.abs(cents(f, mtof(m('D5')))) < 15, `${cents(f, mtof(m('D5'))).toFixed(1)} cents`); }
 
 for (const n of ['A2', 'A4']) { const f = acPitch(I.pulse(m(n), 1, { vib: 0 }), 0.1, 6000, mtof(m(n))); ok(`pulse ${n} in tune`, Math.abs(cents(f, mtof(m(n)))) < 5, `${cents(f, mtof(m(n))).toFixed(1)} cents`); }

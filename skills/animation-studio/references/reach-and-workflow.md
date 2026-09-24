@@ -42,9 +42,11 @@ Measured on the rendered file:
 - Frames default to the sync markers (the hits). The title defaults to score.js `poster: { title, sub, frames, focus: { zoom, fx, fy } }`, then brand.json.
 - Keep titles to ≤ 5 words. Thumbnails are judged at ~210 px wide on a phone.
 
-## Every format from one score (`render.js formats 16:9,9:16,1:1,4:5 [--draft]`)
+## Every format from one score (`render.js formats 16:9,9:16,1:1,4:5 [--draft | --res 2160]`)
 - Works when score.js uses `const FORMAT = U.pickFormat('16:9')` and film.js lays out from `G.W`/`G.H`/`G.SAFE`, as the template does.
 - It renders `out/<name>-9x16.mp4` and the others. Any command takes `--format 9:16` to try one.
+- **2K and 4K:** `--res N` sets the frame's short side in pixels: `--res 1440` (2K), `--res 2160` (4K). The film still draws on its 1080 stage and the canvas scales it, so lines and text stay sharp. Outputs are suffixed `-1440p` / `-2160p` (`out/<name>-16x9-2160p.mp4`); Verify with the same flags (`verify --format 16:9 --res 2160`), since every command reads the file with its own suffix. A 4K render takes about 4× as long.
+- **For WhatsApp chats:** send a small 720p copy, since WhatsApp recompresses anything big: `ffmpeg -i out/<name>-9x16.mp4 -vf scale=720:-2 -c:v libx264 -crf 26 -preset slow -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart out/<name>-whatsapp.mp4` (about 5 MB for 40s). Status, Reels and TikTok take the full 1080p 9:16 file.
 
 ## Draft renders and caching
 - `--draft` on `video`, `clip`, `stills` or `formats` renders at half resolution: 2–4× faster, with the same picture. Outputs are suffixed `-draft`.

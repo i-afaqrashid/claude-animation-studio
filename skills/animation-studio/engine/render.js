@@ -13,7 +13,7 @@
 //   node engine/render.js analyze song.mp3        -> tempo, beats, bars, sections, lyrics of your own song (beats.js)
 //   node engine/render.js snap https://site       -> a phone (or --desktop) screenshot of a live site in assets/
 //   more: brand brand-from plan qa pacing poster formats srt (engine/tools/*.js)
-//   add --gif to clip for a shareable GIF next to the MP4 · --draft for half resolution · --format 9:16 · --style neon
+//   add --gif to clip for a shareable GIF next to the MP4 · --draft for half resolution · --res 1440 (2K) / 2160 (4K) · --format 9:16 · --style neon
 // Anywhere a time is expected: seconds (12.5), bar:beat from the score clock (8:2 = T(8, 2)),
 // or a named marker from score.js `markers` with an optional offset in seconds (@drop, @drop-2, @drop+0.5).
 const { spawn, execFileSync } = require('child_process');
@@ -30,9 +30,11 @@ const flagVal = (name) => { const i = RAW_ARGS.indexOf(name); return i >= 0 ? RA
 if (flagVal('--format')) process.env.ANIM_FORMAT = flagVal('--format');
 if (flagVal('--style')) process.env.ANIM_STYLE = flagVal('--style');
 const DRAFT = RAW_ARGS.includes('--draft'); // half-resolution frames: 2-4x faster, for iterating
-const SCALE = DRAFT ? 0.5 : 1;
-// output names carry the format override and the draft flag: out/video-9x16-draft.mp4, out/<name>-9x16.mp4
-const SUFFIX = (process.env.ANIM_FORMAT ? '-' + process.env.ANIM_FORMAT.replace(':', 'x') : '') + (process.env.ANIM_STYLE ? '-' + process.env.ANIM_STYLE : '') + (DRAFT ? '-draft' : '');
+// --res 1440 (2K) / --res 2160 (4K): the frame's SHORT side in pixels. The film still draws on its 1080 stage;
+// the canvas scales it up, so lines and text stay sharp (vector) at any size.
+const RES = flagVal('--res') ? parseInt(flagVal('--res'), 10) : 0;
+// output names carry the format override, the resolution and the draft flag: out/video-9x16-2160p.mp4, out/<name>-9x16.mp4
+const SUFFIX = (process.env.ANIM_FORMAT ? '-' + process.env.ANIM_FORMAT.replace(':', 'x') : '') + (process.env.ANIM_STYLE ? '-' + process.env.ANIM_STYLE : '') + (RES && !DRAFT ? `-${RES}p` : '') + (DRAFT ? '-draft' : '');
 // `analyze` runs before there is a score (it is how a film cut to someone else's song starts)
 if (RAW_ARGS[0] === 'analyze') {
   require('./tools/analyze.js')({ ROOT, OUT, fs, path }, 'analyze', RAW_ARGS.slice(1)).then(() => process.exit(process.exitCode || 0), (e) => { console.error(e.message); process.exit(1); });
@@ -44,6 +46,7 @@ if (!FPS || !DURATION) throw new Error('score.js must export FPS and DURATION');
 const UTIL = require('./util');
 const [FW, FH] = UTIL.formatSize ? UTIL.formatSize(SCORE.FORMAT) : [1920, 1080]; // frame size (16:9 unless the score says otherwise)
 const PORTRAIT = FH > FW;
+const SCALE = DRAFT ? 0.5 : RES ? RES / Math.min(FW, FH) : 1;
 const thumb = (long) => (PORTRAIT ? `scale=-2:${long}` : `scale=${long}:-2`); // scale thumbnails by the long side
 fs.mkdirSync(OUT, { recursive: true });
 
@@ -518,9 +521,9 @@ const TOOLS = { brand: 'brand', 'brand-from': 'brand', poster: 'poster', formats
 async function main() {
   const [mode, ...rest] = RAW_ARGS;
   const args = [];
-  for (let i = 0; i < rest.length; i++) { if (rest[i] === '--draft') continue; if (rest[i] === '--format' || rest[i] === '--style') { i++; continue; } args.push(rest[i]); }
+  for (let i = 0; i < rest.length; i++) { if (rest[i] === '--draft') continue; if (rest[i] === '--format' || rest[i] === '--style' || rest[i] === '--res') { i++; continue; } args.push(rest[i]); }
   if (TOOLS[mode]) {
-    const CTX = { ROOT, OUT, SCORE, FPS, DURATION, FW, FH, PORTRAIT, MARKERS, DRAFT, SCALE, SUFFIX, VIDEO, FFMPEG, FFPROBE, CHROME,
+    const CTX = { ROOT, OUT, SCORE, FPS, DURATION, FW, FH, PORTRAIT, MARKERS, DRAFT, RES, SCALE, SUFFIX, VIDEO, FFMPEG, FFPROBE, CHROME,
       parseTime, markerTime, barBeat, sectionAt, serve, openWorker, evaluate, grab, sleep, renderRange, countFrames, finalName, acquireLock, lintDeterminism, thumb,
       page: () => PAGE, fs, path, os, execFileSync, spawn };
     await require(`./tools/${TOOLS[mode]}.js`)(CTX, mode, args);

@@ -24,16 +24,16 @@ Ask Claude for a video, and it:
 
 1. writes the story as a **song structure** that fits the moment (a last-minute goal might get a tense build, a beat of silence and a huge drop),
 2. puts every moment in one **score file** that both the music and the animation read,
-3. **synthesizes the soundtrack** in plain JavaScript: drums, bass, pads, brass, music box, formant-synthesized crowds and choirs, and sound effects,
+3. **synthesizes the soundtrack** in plain JavaScript: drums, bass, pads, brass, music box, desi instruments (dholak, tabla, harmonium, shehnai, dhol), formant-synthesized crowds and choirs, and sound effects,
 4. **draws every frame** in a hand-drawn paper-cutout style (boiling pencil lines, hatching, torn-paper captions),
 5. lets you **watch and listen before rendering** (a live preview in your browser with a timeline of every scene and moment),
-6. renders a 1080p MP4 with headless Chrome + ffmpeg, then **checks its own work**: a storyboard for your approval before the full render, loudness and true-peak measurements, and `verify`, which measures that the sound and the picture hit every moment marked as a sync hit (±20 ms, ±1 frame), and fails any it can't measure clearly.
+6. renders a 1080p MP4 (or 2K or 4K) with headless Chrome + ffmpeg, then **checks its own work**: a storyboard for your approval before the full render, loudness and true-peak measurements, and `verify`, which measures that the sound and the picture hit every moment marked as a sync hit (±20 ms, ±1 frame), and fails any it can't measure clearly.
 
 Because one score drives both sides, a football pass can *play* a note of the melody, a title can stamp one letter per 8th note, and fireworks can burst exactly on the clap.
 
 **Any format, including vertical.** 16:9 for YouTube and X, **9:16 for Reels, TikTok and Shorts** (laid out for the platforms' safe areas, not cropped), 1:1 and 4:5 for feeds. A UI kit draws crisp app screens (phone mockup, cards, chat, stats, buttons) inside the hand-drawn world, which makes it good for app and brand promos too.
 
-**Your own characters.** People are fully customizable: hair (curly, long, bun, hijab…), beards, glasses, outfits (jersey, hoodie, dress, shalwar kameez, thobe, abaya, sari, suit…), headwear (topi, cap, turban, ghutra), build and colours. They walk, gesture (wave, point, cheer, phone, dua, a cricket bat, a microphone…) and lip-sync to the voiceover, and dogs, cats and birds join them. Claude can also build new characters, like pets, robots or mascots, from the same hand-drawn primitives, and drop your real photos into a film as taped prints. Share a photo and say either **"make a cartoon of me"** (Claude designs a matching character) or **"put this photo in the film"** (the real photo appears as a taped print).
+**Your own characters.** People are fully customizable: hair (curly, long, bun, hijab…), beards, glasses, outfits (jersey, hoodie, dress, shalwar kameez, thobe, abaya, sari, suit, sherwani, lehenga…), headwear (topi, cap, turban, ghutra, a groom's pagri with a sehra, a bride's dupatta), bridal jewellery and mehndi, build and colours. They walk, gesture (wave, point, cheer, phone, dua, bhangra, a dhol, a cricket bat, a microphone…) and lip-sync to the voiceover, and dogs, cats and birds join them. Claude can also build new characters, like pets, robots or mascots, from the same hand-drawn primitives, and drop your real photos into a film as taped prints. Share a photo and say either **"make a cartoon of me"** (Claude designs a matching character) or **"put this photo in the film"** (the real photo appears as a taped print).
 
 **Sound beyond the synth.**
 - Eight genre packs lay down a full backing track in one call: lo-fi, chiptune, orchestral, EDM, afrobeats, qawwali, desi pop and boom-bap.
@@ -77,6 +77,7 @@ node engine/render.js qa       # text in sampled frames (1/s + each marker): saf
 node engine/render.js pacing   # the hook in the first 3 seconds, and the cuts
 node engine/render.js poster   # three YouTube thumbnails + a vertical cover
 node engine/render.js formats 16:9,9:16   # every format from one score
+node engine/render.js formats 16:9 --res 2160   # a 4K master (--res 1440 for 2K)
 node engine/render.js analyze assets/song.mp3   # tempo, beats, bars, sections of your own song
 node engine/render.js snap https://your.site --full   # a phone screenshot of a real website
 node engine/render.js brand-from https://your.site    # brand.json: colours, fonts, logo
@@ -86,7 +87,7 @@ Add `--style neon` (or `flat`, `pixel`, `chalk`, `watercolor`) to any command to
 
 Times can be seconds, `bar:beat` (`8:2`), or a named moment from the score (`@drop`, `@drop+0.5`).
 
-Start from a demo with `--from <name>`: `app-promo`, `product-launch`, `qawwali-night`, `gully-cricket`, `birthday-card`, `lyric-video`, or `world-cup-2026` (to re-render or remix the original 58s film).
+Start from a demo with `--from <name>`: `app-promo`, `product-launch`, `qawwali-night`, `gully-cricket`, `birthday-card`, `wedding-invite`, `lyric-video`, or `world-cup-2026` (to re-render or remix the original 58s film).
 
 ## What's inside
 
@@ -97,7 +98,8 @@ skills/animation-studio/
 ├── engine/               synth (DSP, instruments, mixing), drawing toolkit, characters, renderer
 ├── template/             a 23s starter film (any format)
 ├── examples/             starters: app-promo, product-launch, qawwali-night, gully-cricket,
-│                         birthday-card, lyric-video, world-cup-2026 (see references/starters.md)
+│                         birthday-card, wedding-invite, lyric-video, world-cup-2026
+│                         (see references/starters.md)
 └── scripts/new-project.js     scaffolds a new film
 ```
 

@@ -837,7 +837,89 @@ function scratch(len = 0.32) {
   return out;
 }
 
+// ================= WEDDING (South Asian) =================
+// shehnai: the double-reed horn of weddings. It plays one CONTINUOUS line: meend (glides from note to
+// note), andolan (a slow, wide vibrato that grows into long notes), and kan (a grace note from above).
+// notes: [{ t, dur, midi, kan?: semitones above (a grace note), slide?: glide time in s }], t relative.
+// A nasal, bright reed: a band-limited saw + a narrow pulse through the bore's resonances, breath, soft clip.
+function shehnaiLine(notes, { vib = 0.32, vibRate = 5.4, glide = 0.075, breath = 0.045, bright = 1, seed = 1, attack = 0.035, release = 0.12 } = {}) {
+  const end = Math.max(...notes.map((n) => n.t + n.dur)) + release + 0.05;
+  const out = buf(end);
+  const r = rng(seed), nz = rng(seed * 17 + 3);
+  const saw = new Saw(Math.abs(r())), sq = new Square(Math.abs(r()), 0.22);
+  const lp = new SVF(), p1 = new SVF(), p2 = new SVF(), p3 = new SVF(), bh = new SVF(), dc = new OnePole();
+  const ns = notes.slice().sort((a, b) => a.t - b.t);
+  let k = 0, amp = 0, semis = ns[0].midi;
+  const vr = vibRate * (0.95 + 0.1 * Math.abs(r()));
+  for (let i = 0; i < out.length; i++) {
+    const t = i / SR;
+    while (k + 1 < ns.length && t >= ns[k + 1].t) k++;
+    const n = ns[k], u = t - n.t, prev = ns[k - 1];
+    const legato = prev && n.t - (prev.t + prev.dur) < 0.06;
+    const sounding = t >= n.t && t < n.t + n.dur;
+    // pitch: glide in from the previous note (meend) or scoop up a little on a fresh attack; the grace note
+    let target = n.midi;
+    if (n.kan && u < 0.07) target = n.midi + n.kan;
+    const g = n.slide ?? (legato ? glide : 0.04);
+    const startFrom = legato ? prev.midi : n.midi - 0.6;
+    const pitch = u < g ? startFrom + (target - startFrom) * (1 - Math.pow(1 - u / g, 2)) : target;
+    semis += (pitch - semis) * (u < g ? 1 : 0.02); // follow the glide exactly, then settle
+    const v = u > 0.22 ? vib * Math.min(1, (u - 0.22) / 0.35) * Math.sin(TAU * vr * t + 0.3 * Math.sin(TAU * 0.7 * t)) : 0;
+    const f = mtof(semis + v);
+    // breath: a small dip between legato notes, a real attack after a rest
+    const want = sounding ? (legato && u < 0.03 ? 0.82 : 1) : 0;
+    const rate = want > amp ? 1 / (attack * SR) : 1 / (release * SR);
+    amp += Math.max(-rate, Math.min(rate, want - amp));
+    const src = saw.next(f) * 0.62 + sq.next(f) * 0.38;
+    const body = lp.lp(src, 3200 + 1600 * bright, 0.8) * 0.55 + p1.bp(src, 1150, 2.6) * 0.9 + p2.bp(src, 2350, 3.5) * 0.55 + p3.bp(src, 3600, 4) * 0.28 * bright;
+    const air = bh.bp(nz(), 2800, 0.9) * breath * (0.5 + amp);
+    out[i] = Math.tanh((dc.hp(body, 60) + air) * amp * 1.8) * 0.5;
+  }
+  return out;
+}
+const shehnai = (midi, dur, opts) => shehnaiLine([{ t: 0, dur, midi }], opts);
+
+// dhol: the big two-headed wedding drum, played with sticks. 'dagga' = the bass skin (a deep boom that
+// drops in pitch), 'tilli' = the thin stick on the treble skin (a sharp ring), 'both' = the two at once.
+function dhol(stroke = 'dagga', { seed = 1, pitch = 1, decay = 1 } = {}) {
+  const out = buf(1.1);
+  const w = rng(seed), lp = new OnePole(), bp = new SVF(), bp2 = new SVF();
+  let ph = 0, ph2 = 0;
+  const bass = stroke === 'dagga' || stroke === 'both', treb = stroke === 'tilli' || stroke === 'both';
+  for (let i = 0; i < out.length; i++) {
+    const t = i / SR;
+    let s = 0;
+    if (bass) {
+      const f = (58 + 62 * Math.exp(-t / 0.045)) * pitch;
+      ph += f / SR; ph2 += (f * 1.58) / SR;
+      s += (Math.sin(TAU * ph) + 0.25 * Math.sin(TAU * ph2)) * Math.exp(-t / (0.32 * decay)) * 1.1;
+      s += lp.lp(w(), 320) * Math.exp(-t / 0.018) * 1.6; // the skin slap
+    }
+    if (treb) {
+      const e = Math.exp(-t / (0.09 * decay));
+      s += (Math.sin(TAU * 510 * pitch * t) * 0.5 + Math.sin(TAU * 790 * pitch * t) * 0.3) * e * 0.7;
+      s += bp.bp(w(), 2100, 1.8) * Math.exp(-t / 0.012) * 1.4 + bp2.bp(w(), 900, 2) * Math.exp(-t / 0.03) * 0.4; // the stick crack
+    }
+    out[i] = Math.tanh(s * 1.3) * 0.85;
+  }
+  return out;
+}
+// ghungroo: a string of small ankle bells shaken once (a cluster of bright pings spread over ~50 ms)
+function ghungroo(seed = 1, { size = 1 } = {}) {
+  const out = buf(0.7), r = rng(seed);
+  for (let k = 0; k < 9; k++) {
+    const t0 = Math.abs(r()) * 0.05 * size, f = 4200 + Math.abs(r()) * 3800, g = 0.12 + Math.abs(r()) * 0.1;
+    const s0 = Math.floor(t0 * SR);
+    for (let i = 0; i < SR * 0.4 && s0 + i < out.length; i++) {
+      const t = i / SR, e = Math.exp(-t / (0.06 + 0.05 * Math.abs(r())));
+      out[s0 + i] += g * e * (Math.sin(TAU * f * t) + 0.5 * Math.sin(TAU * f * 1.47 * t) + 0.3 * Math.sin(TAU * f * 2.09 * t));
+    }
+  }
+  return out;
+}
+
 module.exports = {
+  shehnai, shehnaiLine, dhol, ghungroo,
   glass, scratch,
   kick, snare, clap, hat, crash, tom, shaker, bell, bass, padNote, pluck, guitar, epiano, musicBox, marimba, brassNote, voice,
   dholak, tabla, harmonium, ting, pulse, triangle, chipNoise, supersaw, bass808, strings, pizz, timpani, logDrum, rim, vinyl,

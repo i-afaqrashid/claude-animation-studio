@@ -216,14 +216,18 @@ const probe = (file) => JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-sho
     Ch.person(ctx, { x: 300, y: 1700, s: 0.5, ...Ch.walk(t, { x0: 300 }), gesture: 'wave', mouth: { open: 0.6, wide: 0.5, talking: true }, style: { outfit: 'sari', hairStyle: 'bun' } });
     Ch.person(ctx, { x: 600, y: 1700, s: 0.5, pose: 'stand', gesture: 'bat', style: { outfit: 'thobe', headwear: 'ghutra' } });
     Ch.dog(ctx, { x: 850, y: 1700, s: 0.6, t }); Ch.cat(ctx, { x: 950, y: 1700, s: 0.5, t }); Ch.bird(ctx, { x: 900, y: 1500, t });
+    const seat = Ch.horse(ctx, { x: 250, y: 1150, s: 0.5, walk: t % 1 }).seat;
+    Ch.person(ctx, { x: seat[0], y: seat[1], s: 0.4, pose: 'sit', style: { outfit: 'sherwani', headwear: 'pagri', sehra: true, garland: 'flowers', glasses: 'bold', build: 'heavy' } });
+    Ch.person(ctx, { x: 600, y: 1150, s: 0.5, pose: 'stand', gesture: 'bhangra', style: { outfit: 'lehenga', headwear: 'dupatta', jewelry: true, bangles: '#D81E3A', mehndi: true, garland: 'roses' } });
+    Ch.person(ctx, { x: 850, y: 1150, s: 0.5, pose: 'stand', gesture: 'dhol', style: { outfit: 'kameez', garland: 'notes' } });
   } });
 })();`);
   const kr = spawnSync(process.execPath, ['engine/render.js', 'stills', '1.5'], { cwd: kit, encoding: 'utf8' });
   const kOut = kr.stdout + kr.stderr;
-  pass('maps, pins, routes, counters, charts, gestures, outfits and animals draw without errors', kr.status === 0 && !/EXCEPTION|Error/.test(kOut) && fs.existsSync(path.join(kit, 'out', 'stills', 't_001.50.png')), kOut.slice(-300));
+  pass('maps, pins, routes, counters, charts, gestures, outfits (incl. wedding), a horse and animals draw without errors', kr.status === 0 && !/EXCEPTION|Error/.test(kOut) && fs.existsSync(path.join(kit, 'out', 'stills', 't_001.50.png')), kOut.slice(-300));
 
   // 9. every starter scaffolds and draws its storyboard (no music needed for that)
-  for (const ex of ['qawwali-night', 'gully-cricket', 'birthday-card', 'lyric-video', 'product-launch']) {
+  for (const ex of ['qawwali-night', 'gully-cricket', 'birthday-card', 'wedding-invite', 'lyric-video', 'product-launch']) {
     const dir = path.join(tmp, `ex-${ex}`);
     const sx = spawnSync(process.execPath, [path.join(SKILL, 'scripts', 'new-project.js'), dir, '--from', ex], { encoding: 'utf8' });
     const bx = sx.status === 0 && spawnSync(process.execPath, ['engine/render.js', 'board'], { cwd: dir, encoding: 'utf8', timeout: 300000 });

@@ -9,7 +9,8 @@ Scaffold with `node <skill-dir>/scripts/new-project.js <target-dir> [--from <exa
 | `product-launch` | 16:9 | a launch or explainer with a voiceover, captions, counters and charts |
 | `qawwali-night` | 16:9 | music-first films: a band or a performance, a tempo that speeds up, singing |
 | `gully-cricket` | 9:16 | a comic escalation with dialogue: sports, mishaps, pranks |
-| `birthday-card` | 1:1 | a personal card with a sung name: birthdays, weddings, Eid |
+| `birthday-card` | 1:1 | a personal card with a sung name: birthdays, anniversaries, Eid |
+| `wedding-invite` | 9:16, any | a wedding invitation: the names, the Mehndi, Baraat and Walima details, and a baraat on a horse |
 | `lyric-video` | 9:16 | a film cut to the user's own song (`analyze`) |
 | `world-cup-2026` | 16:9 | only to re-render or remix that film (older API) |
 
@@ -54,6 +55,19 @@ The last ball of a street cricket match, six to win, as a comic escalation built
 - Each syllable of the name stamps in as it is sung. On the last note the candles blow out, with a party popper, a flash and confetti.
 - Music box, pizzicato strings and a sung melody in 3/4 time (`beatsPerBar: 3`).
 - `STYLE: 'watercolor'` in score.js.
+
+## wedding-invite (9:16, lays itself out for 16:9, 1:1 and 4:5, 39s)
+An animated shaadi card. Everything it says is in the `INVITE` block at the top of score.js: the names (with optional Urdu names), the city, the three events (title, Urdu title, date, time, venue), the save-the-date line, the hosts, an optional Bismillah, and an optional credit line. All of them start as placeholders, so confirm every name, date and venue with the family before sharing.
+- **The story, one scene per ceremony:** the doors stay closed through a shehnai alaap. They open on the dhol to reveal the couple under a floral arch, and the names stamp in on the beats. An invitation scroll unrolls, and the groom's glasses catch the light on a ting. Then:
+  - Mehndi: a henna hand draws itself one stroke per 8th, while the taali claps.
+  - Baraat: at night, the groom rides a decorated horse behind a dhol player, with fireworks on the big beats.
+  - Walima: the couple sit on a sofa under chandeliers that sparkle on every note.
+  
+  Then a dhol roll, a held breath, and "Shaadi Mubarak!" with everyone dancing bhangra, the chorus singing it and petals falling. It ends on a save-the-date medallion.
+- **The music:** the shaadi recipe in music-cookbook.md: a shehnai line with meend and kan over a drone, a dholak mehndi groove, the dhol chaal with a brass band, soft tabla and strings, and a sung "shaa-di mu-baa-rak!".
+- **The look:** a gold-framed card with metallic gold lettering (Great Vibes, Cinzel and Cormorant Garamond, OFL, in `assets/fonts/`), and Urdu in Nastaliq.
+- **The people:** the couple are `Ch.person` with `sherwani` + `pagri` + `sehra` and `lehenga` + `dupatta` + `jewelry` + `mehndi`, defined once as `GROOM` and `BRIDE` at the top of film.js. Change those two to look like the real couple, and check them with `render.js cast`.
+- **Publishing:** `render.js formats 9:16,16:9,1:1,4:5` gives every platform, and `--res 2160` a 4K master. For sending in WhatsApp chats, make a small 720p copy (reach-and-workflow.md).
 
 ## lyric-video (9:16, 29s)
 A film cut to a song the film did not write.
