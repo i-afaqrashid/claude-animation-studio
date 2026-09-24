@@ -1,4 +1,4 @@
-// node engine/render.js qa [t …] [--every 1]  -> visual QA of every drawn word + out/qa.png
+// node engine/render.js qa [t …] [--every 1]  -> visual QA of the text in sampled frames + out/qa.png
 // For frames every second (and one frame after each marker) it checks all text the film draws:
 //   outside the safe area (platform buttons/captions would cover it) · too small to read on a phone ·
 //   overlapping other text · low contrast against what is behind it (outlined text is exempt).

@@ -78,6 +78,13 @@ const probe = (file) => JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-sho
   pass('clip @land-0.5 @land+0.5 --gif → 1s preview with sound + a GIF', clipOk, clip.code ? clip.out.slice(-300) : '');
   const ver = run(['engine/render.js', 'verify']);
   pass('verify: sound and picture hit @land', ver.code === 0 && /land .*✓.*✓/.test(ver.out) && /✓ in sync/.test(ver.out), ver.out.split('\n').filter((l) => /land|sync/.test(l)).join(' | '));
+  // two equally strong clicks 100 ms apart around @land: verify must call it unclear (a fail), not pick one
+  const clicks = spawnSync(process.execPath, ['-e', `const {Bus,SR}=require('./engine/audio/dsp');const MIX=require('./engine/audio/mix');const b=new Bus(Math.ceil(${DURATION}*SR));for(const t of [4.4,4.5])for(let i=0;i<480;i++){const v=0.8*Math.exp(-i/120)*(i%2?1:-1);b.L[Math.round(t*SR)+i]+=v;b.R[Math.round(t*SR)+i]+=v;}MIX.writeWav('out/clicks.wav',b)`], { cwd: proj, encoding: 'utf8' });
+  const amb = path.join(proj, 'out', 'ambiguous.mp4');
+  spawnSync('ffmpeg', ['-v', 'error', '-y', '-i', final, '-i', path.join(proj, 'out', 'clicks.wav'), '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-c:a', 'aac', amb]);
+  const va = run(['engine/render.js', 'verify', 'ambiguous']);
+  const vb = run(['engine/render.js', 'verify', 'ambiguous', '--allow-unclear']);
+  pass('verify calls two equal onsets unclear (fails, passes only with --allow-unclear)', clicks.status === 0 && va.code === 1 && /two onsets are almost equally steep/.test(va.out) && vb.code === 0, `exit ${va.code} / ${vb.code}`);
   const goodScore = fs.readFileSync(scorePath, 'utf8');
   fs.writeFileSync(scorePath, goodScore.replace("land: { t: ev.claudeLand, sync: 'av' }", "land: { t: ev.claudeLand + 0.1, sync: 'av' }"));
   const ver2 = run(['engine/render.js', 'verify']);
@@ -145,7 +152,7 @@ const probe = (file) => JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-sho
   const dsz = fs.existsSync(path.join(proj, 'out', 'stills', 't_002.00.png')) ? pngSize(path.join(proj, 'out', 'stills', 't_002.00.png')) : [];
   pass('--draft stills render at half size (960x540)', dr.code === 0 && dsz[0] === 960 && dsz[1] === 540, dsz.join('x'));
   const q = run(['engine/render.js', 'qa', '@land', '2']);
-  pass('qa probes every drawn word', q.code === 0 && /visual QA: 2 frames/.test(q.out), q.out.split('\n')[0]);
+  pass('qa probes the text in the sampled frames', q.code === 0 && /visual QA: 2 frames/.test(q.out), q.out.split('\n')[0]);
   const pl = run(['engine/render.js', 'plan']);
   const planMd = path.join(proj, 'out', 'plan.md');
   pass('plan → out/plan.md with a bar map and a claims checklist', pl.code === 0 && fs.existsSync(planMd) && /## Bar map/.test(fs.readFileSync(planMd, 'utf8')) && /- \[ \] "a tiny film, made of code\."/.test(fs.readFileSync(planMd, 'utf8')), pl.out.split('\n')[0]);

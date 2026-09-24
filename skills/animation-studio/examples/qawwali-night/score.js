@@ -61,9 +61,10 @@
     else if (b >= 10) strokes.push({ t, bol: 'tin', hand: 'right' });
   });
   // a tabla roll into the peak and into the end
-  const rolls = [[T(13, 3), T(13, 3.7)], [T(17, 3), T(18)]];
-  // a held breath (an 8th of silence) before the peak, so everyone lands on it together
-  const breath = [T(13, 3.72), T(14)];
+  const rolls = [[T(13, 3), T(13, 3.7)], [T(17, 3), T(17, 3.7)]];
+  // a held breath (an 8th of silence) before the peak and before the final hit, so everyone lands
+  // on them together (and verify can tell the hit from the last stroke of the roll)
+  const breaths = [[T(13, 3.72), T(14)], [T(17, 3.72), T(18)]];
 
   // ---------- the crowd ----------
   const rng = U.mulberry32(7);
@@ -92,6 +93,6 @@
   // (the English meaning, for the description: "The night is awake, the music is awake / Today my heart
   //  is joyful / Joyful, joyful, the heart is joyful")
 
-  const SCORE = { FPS, FORMAT, W, H, SAFE, DURATION, clock, T, S, m, TONIC, sung, runs, claps, strokes, rolls, breath, wah, notesRain, petals, ev, markers, subtitles };
+  const SCORE = { FPS, FORMAT, W, H, SAFE, DURATION, clock, T, S, m, TONIC, sung, runs, claps, strokes, rolls, breaths, wah, notesRain, petals, ev, markers, subtitles };
   if (node) module.exports = SCORE; else globalThis.SCORE = SCORE;
 })();

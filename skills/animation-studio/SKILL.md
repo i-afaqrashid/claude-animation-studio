@@ -1,7 +1,7 @@
 ---
 name: animation-studio
 description: This skill should be used when the user asks to "make an animated video about X with music", "make a cartoon / animated short", "animate this story", "make a video like the Opus animations", "make an explainer animation (with a voiceover)", "make a promo video for my app / brand / website", "make an animated Reel / TikTok / Short", "make a lyric video / animate to my song", "make an animated map or infographic", or "make a jingle / birthday video" — a new hand-drawn 2D film where every frame is drawn in code and the soundtrack is synthesized in code (or is the user's own song, beat-analysed), synced from one score, delivered as a 1080p MP4 in 16:9, 9:16, 1:1 or 4:5. Not for CSS/web/UI animation, Lottie/SVG/GIF assets, editing existing video footage, or Remotion/Manim projects.
-version: 1.0.0
+version: 1.0.1
 ---
 
 # Animation Studio
@@ -84,7 +84,7 @@ Name the key moments in `markers` (`drop: { t: ev.drop, sync: 'av' }`). Every co
 Render parts into buses, add reverb or delay sends, and sidechain the pads and bass to the kick in energetic sections. Then run `MIX.mixdown → highpass → gate (a silence, after the reverbs) → fadeOut → master → writeWav`. What the engine offers (recipes in `references/music-cookbook.md`):
 - **Instruments:** kit, bass, pads, brass, music box, marimba, guitar, e-piano, strings, pizzicato, timpani, 808, supersaw, chip waves, dholak, tabla, harmonium, and SFX (glass, scratch, whoosh, pop…).
 - **Genre packs:** `Genre.play('lofi'|'chiptune'|'orchestral'|'edm'|'afrobeats'|'qawwali'|'desi'|'boombap', …)`, a full backing in one call. You write the hook.
-- **Voiceover:** `Voice.speak([{ at, text, voice, who, display, alt }])` does offline TTS with word times and a mouth track (`out/voice.json`). Duck the music under it with `MIX.duck`.
+- **Voiceover:** `Voice.speak([{ at, text, voice, who, display, alt }])` does offline TTS with estimated word times and a mouth track (`out/voice.json`). Duck the music under it with `MIX.duck`.
 - **Singing:** `Sing.line('si-tey dot pee-kay', notes)` or `Sing.phrase(notes)`, and `Sing.happyBirthday(name)`, from a formant singer. It is best on short hooks, doubled by an instrument, with the words on screen.
 - **The user's song:** run `node engine/render.js analyze song.mp3 [--lrc lyrics.lrc]` to get `beats.js`, then `MIX.loadAudio` for the soundtrack. Only use music the user has the rights to.
 
@@ -127,7 +127,7 @@ Read the PNGs and critique every shot:
 Fix, then re-render the same times. Useful checks:
 - `cast` shows every character in `globalThis.CAST` in 6 expressions.
 - `plan` writes a one-page treatment and a claims checklist.
-- `qa` checks every drawn word for the safe area, size, overlap and contrast.
+- `qa` checks the text drawn in sampled frames (one per second, plus each marker; add times to check more) for the safe area, size, overlap and contrast.
 - `pacing` checks the first-3-seconds hook and the cuts.
 - Add `--draft` to renders for half-resolution speed. Render commands warn about `Math.random`/`Date.now` in film files.
 
@@ -148,7 +148,7 @@ cd <target-dir> && node engine/render.js verify     # sound ±20 ms and picture 
 
 `video` takes longer than the Bash tool's 2-minute timeout: launch it with `run_in_background: true` and wait for `out/video.mp4 done`.
 - A ✗ from `verify` means one side is late: fix it in `score.js`, never by nudging one side by hand.
-- A `?` means nothing distinct happens there. Make it a clear hit: a real transient in the sound, a flash or cut in the picture, or a held breath before it. Otherwise drop its `sync`.
+- A `?` (unclear) also fails. Either nothing distinct happens there, or two onsets are almost equally steep and far apart, like a sung pickup just before a sung downbeat, or a drum roll into the hit. Fix it with a real transient in the sound, a flash or cut in the picture, or an 8th of held breath before it; otherwise drop its `sync`. `--allow-unclear` turns these into warnings. Verify the files you actually publish: a re-encode can tip a near-tie.
 
 For publishing, use:
 - `srt` for subtitle files,

@@ -16,7 +16,7 @@ Every film below was made with this plugin: the pictures, the music, the singing
 |:--:|:--:|
 | [![Qawwali Night](docs/gallery/qawwali-night.gif)](https://github.com/i-afaqrashid/claude-animation-studio/releases/download/demos/qawwali-night.mp4)<br>**Qawwali Night** · `qawwali-night` · 16:9 · 43s<br>An original qawwali that speeds up from 88 to 152 BPM. The lead sings in Roman Urdu with Nastaliq captions, and the chorus answers. Harmonium, tabla and taali play, and the crowd showers the stage with notes and petals. | [![Gully Cricket](docs/gallery/gully-cricket.gif)](https://github.com/i-afaqrashid/claude-animation-studio/releases/download/demos/gully-cricket.mp4)<br>**Gully Cricket** · `gully-cricket` · 9:16 · 27s<br>Last ball, six to win. Chacha commentates (a real voiceover, lip-synced): THWACK, it's up… it's up… SIX! Then aunty's window. |
 | [![Chai aur Baarish](docs/gallery/lyric-video.gif)](https://github.com/i-afaqrashid/claude-animation-studio/releases/download/demos/lyric-video.mp4)<br>**Chai aur Baarish** · `lyric-video` · 9:16 · 29s<br>A lyric video cut to a song with `analyze`: its beats, bars and word-timed lyrics. The song itself is lo-fi made in code. | [![Happy Birthday](docs/gallery/birthday-card.gif)](https://github.com/i-afaqrashid/claude-animation-studio/releases/download/demos/birthday-card.mp4)<br>**Happy Birthday, Ayesha** · `birthday-card` · 1:1 · 22s<br>A watercolour card that sings "Happy Birthday" with any name, and the candles blow out on the last note. |
-| [![Animation Studio launch](docs/gallery/product-launch.gif)](https://github.com/i-afaqrashid/claude-animation-studio/releases/download/demos/product-launch.mp4)<br>**The launch film** · `product-launch` · 16:9 · 36s<br>A voiceover with word-exact captions, six looks, four genres, a parade, a map and a chart. | [▶ **Pantrio**](https://github.com/i-afaqrashid/claude-animation-studio/releases/download/demos/app-promo-pantrio.mp4) · `app-promo` · 9:16 · 20s<br>An app promo made with the UI kit (a fictional app).<br><br>[▶ **Claude × Afaq, World Cup 2026**](https://github.com/i-afaqrashid/claude-animation-studio/releases/download/demos/world-cup-2026.mp4) · 16:9 · 58s<br>The film that started it all. |
+| [![Animation Studio launch](docs/gallery/product-launch.gif)](https://github.com/i-afaqrashid/claude-animation-studio/releases/download/demos/product-launch.mp4)<br>**The launch film** · `product-launch` · 16:9 · 36s<br>A voiceover with word-timed captions, six looks, four genres, a parade, a map and a chart. | [▶ **Pantrio**](https://github.com/i-afaqrashid/claude-animation-studio/releases/download/demos/app-promo-pantrio.mp4) · `app-promo` · 9:16 · 20s<br>An app promo made with the UI kit (a fictional app).<br><br>[▶ **Claude × Afaq, World Cup 2026**](https://github.com/i-afaqrashid/claude-animation-studio/releases/download/demos/world-cup-2026.mp4) · 16:9 · 58s<br>The film that started it all. |
 
 ## What it does
 
@@ -27,7 +27,7 @@ Ask Claude for a video, and it:
 3. **synthesizes the soundtrack** in plain JavaScript: drums, bass, pads, brass, music box, formant-synthesized crowds and choirs, and sound effects,
 4. **draws every frame** in a hand-drawn paper-cutout style (boiling pencil lines, hatching, torn-paper captions),
 5. lets you **watch and listen before rendering** (a live preview in your browser with a timeline of every scene and moment),
-6. renders a 1080p MP4 with headless Chrome + ffmpeg, then **checks its own work**: a storyboard for your approval before the full render, loudness and true-peak measurements, and `verify`, which measures that the sound and the picture hit every key moment (±20 ms, ±1 frame).
+6. renders a 1080p MP4 with headless Chrome + ffmpeg, then **checks its own work**: a storyboard for your approval before the full render, loudness and true-peak measurements, and `verify`, which measures that the sound and the picture hit every moment marked as a sync hit (±20 ms, ±1 frame), and fails any it can't measure clearly.
 
 Because one score drives both sides, a football pass can *play* a note of the melody, a title can stamp one letter per 8th note, and fireworks can burst exactly on the clap.
 
@@ -37,7 +37,7 @@ Because one score drives both sides, a football pass can *play* a note of the me
 
 **Sound beyond the synth.**
 - Eight genre packs lay down a full backing track in one call: lo-fi, chiptune, orchestral, EDM, afrobeats, qawwali, desi pop and boom-bap.
-- An offline **voiceover** uses your computer's own text-to-speech. It gives word-exact captions, lip-synced mouths, and music that ducks under the voice.
+- An offline **voiceover** uses your computer's own text-to-speech. It gives captions timed to each word (the word times are estimated from the speech, so they can be a little off), lip-synced mouths, and music that ducks under the voice.
 - A formant singer sings short jingles, and "Happy Birthday" with any name.
 - `analyze` finds the beats, bars and sections of **your own song**, so a lyric video or montage lands on the real beat.
 
@@ -72,8 +72,8 @@ node engine/render.js cast     # every character in 6 expressions -> out/cast.pn
 node engine/render.js clip @drop-2 @drop+3   # one section with sound -> out/clip_*.mp4
 node engine/render.js video    # frames  -> out/video.mp4
 node engine/render.js mux      # final   -> out/my-film.mp4
-node engine/render.js verify   # measures sound + picture at every sync marker
-node engine/render.js qa       # every word on screen: safe area, size, overlap, contrast
+node engine/render.js verify   # measures sound + picture at every sync marker (unclear = fail)
+node engine/render.js qa       # text in sampled frames (1/s + each marker): safe area, size, overlap, contrast
 node engine/render.js pacing   # the hook in the first 3 seconds, and the cuts
 node engine/render.js poster   # three YouTube thumbnails + a vertical cover
 node engine/render.js formats 16:9,9:16   # every format from one score

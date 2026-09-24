@@ -27,7 +27,7 @@ Then a held breath, the plate landing on the drop, stats, and a logo end card. I
 
 ## product-launch (16:9, 36s)
 A launch film for this plugin (every claim in it is true).
-- **Voice:** a voiceover (`Voice.speak`, Samantha) with word-exact captions (`Subs.fromVoice`) and a lip-synced narrator (`Subs.mouth`). The music ducks under the voice (`MIX.duck`).
+- **Voice:** a voiceover (`Voice.speak`, Samantha) with captions timed to each word (`Subs.fromVoice`) and a lip-synced narrator (`Subs.mouth`). The music ducks under the voice (`MIX.duck`).
 - **Montages:** counters (`UI.stat`), then a style montage where `G.setStyle` changes the look on every pluck. Then a genre montage: one bar each of lo-fi, chiptune, qawwali and EDM (`Genre.play`), each in its own style.
 - **People and data:** a parade of outfits walking in and dancing, a Pakistan map with pins (`Data.map`/`pin`), a bar chart, and greetings in four scripts. It ends on an EDM drop into the end card.
 
@@ -38,7 +38,7 @@ A qawwali party on a stage under a shamiana, with original Roman Urdu lyrics and
 - **Tempo:** a tempo map (`makeClock({ tempo })`) speeds it up from 88 to 152 BPM.
 - **Voices:** the lead sings each line and a chorus of five answers it (`Sing.phrase`, the formant singer). A harmonium doubles every sung note, as in a real qawwali, and plays fast runs between lines.
 - **The score drives the hands:** the chorus claps (taali on beats 1–3, khali on 4) and the tabla player's hands hit on the strokes. The harmonium player's right hand follows the pitch of each note, and his left hand pumps the bellows on the beat.
-- **The peak:** a held breath (an 8th of silence) lands the peak. Rupee notes (vail) and rose petals fall, the crowd shouts "واہ!", "Kya baat hai!", and a flash marks the final hit.
+- **The peak:** held breaths (an 8th of silence) land the peak and the final hit. Rupee notes (vail) and rose petals fall, the crowd shouts "واہ!", "Kya baat hai!", and a flash marks the final hit.
 
 It also shows the cross-legged `pose: 'floor'`, a drone, stereo chorus voices, crowd shouts and applause.
 

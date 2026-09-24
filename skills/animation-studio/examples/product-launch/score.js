@@ -1,4 +1,4 @@
-// PRODUCT LAUNCH (16:9, ~36s): a launch film with a voiceover, word-exact captions, counters, a style
+// PRODUCT LAUNCH (16:9, ~36s): a launch film with a voiceover, word-timed captions, counters, a style
 // montage and a genre montage. The product here is this plugin (every claim below is true of it);
 // swap in yours: the voice lines, the facts, the brand colours.
 (function () {

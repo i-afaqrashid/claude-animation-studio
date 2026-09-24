@@ -93,7 +93,7 @@ const mix = MIX.mixdown({ music: musicBus, voice: vo.bus }, { voice: 1 });
 ```
 - Engines (auto-detected in this order; force one with `engine` or env `ANIM_TTS`): **kokoro** (python `kokoro`), **piper** (env `PIPER_MODEL`), **say** (macOS: Samantha, Daniel, Karen, Moira, Tessa; `Rishi`/`Aman` for Indian-English, `Lekha` Hindi, `Majed` Arabic), **espeak-ng**, else **none**: a silent placeholder with estimated word times, so the film still builds.
 - Options per line: `voice`, `rate` (words per minute for `say`), `gain`, `pan`, `alt` (a second-language subtitle line), `who` (which character speaks, for lip-sync).
-- It writes `out/voice.json`: lines with exact word times, and a 30 fps mouth track (`open`, `wide`). Every line is cached in `out/.vo-cache`, so re-running song.js costs nothing.
+- It writes `out/voice.json`: lines with estimated word times, and a 30 fps mouth track (`open`, `wide`). How the times are estimated: with `say`, every word is also spoken on its own, separated by pauses, so its length can be measured. Those lengths are fitted to the real line and each boundary is moved to the nearest quiet moment. Other engines share the line's time by syllables. Expect small errors on fast speech; check the captions in `stills` or `preview`. Every line is cached in `out/.vo-cache`, so re-running song.js costs nothing.
 - In film.js: `const VO = Studio.loadJSON('out/voice.json')` at boot, then `Subs.draw(ctx, t, Subs.fromVoice(VO), { style: 'pop' })` and `mouth: Subs.mouth(VO, t, 'dad')` on the speaking character. `render.js srt` exports the same words.
 - Leave room: about 2.5 words per second, with ≥ 0.4 s between lines. Put hits between sentences, not on top of words.
 
@@ -143,7 +143,7 @@ Stem balance in the loudest section (RMS dB, after GAIN): drums ≈ -13, brass (
 
 If the whole mix reads as one flat loudness (LRA < 3), the intro is too loud or the master is over-driven. Lower the intro instruments, not the drop.
 
-Exact loudness: `LUFS=-14 node song.js` (or `MIX.master(mix, 0.8, undefined, { lufs: -14 })`) solves the drive so the master lands on target (±0.2 LU, measured by `MIX.lufs`, which matches ffmpeg). Targets: -14 LUFS for YouTube/Spotify and other normalised platforms (louder masters just get turned down), -12 to -11 for X and social feeds that don't normalise, -16 for tender films that should stay soft. `levels.js` prints the integrated loudness under its table.
+Target loudness: `LUFS=-14 node song.js` (or `MIX.master(mix, 0.8, undefined, { lufs: -14 })`) solves the drive so the master lands on target (±0.2 LU, measured by `MIX.lufs`, which matches ffmpeg). Targets: -14 LUFS for YouTube/Spotify and other normalised platforms (louder masters just get turned down), -12 to -11 for X and social feeds that don't normalise, -16 for tender films that should stay soft. `levels.js` prints the integrated loudness under its table.
 
 True peak: `MIX.master` limits the 4x-oversampled true peak to -1.5 dBTP by default, which survives AAC and platform resampling (-1.2 dBTP measured after AAC 256k). It costs about 0.1 LU of loudness. `check` must show Peak ≤ -1.0 dBFS on the final MP4.
 

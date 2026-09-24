@@ -105,7 +105,7 @@ const hall = reverb(verb, { room: 0.86, damp: 0.35, predelay: 0.03 });
 const echo = pingpong(dly, 0.34, 0.3, 3500);
 const stems = { drums, claps, harm, drone, lead, chorus, crowd, amb, verb: hall, dly: echo };
 const GAIN = { drums: 0.5, claps: 8, harm: 2, drone: 0.8, lead: 1, chorus: 1.4, crowd: 1, amb: 1, verb: 0.5, dly: 0.3 }; // balanced with engine/tools/levels.js: voices on top, taali clear, tabla under them
-for (const b of [drums, claps, harm, lead, chorus, hall, echo]) MIX.gate(b, sc.breath[0], sc.breath[1], 0.006); // the held breath
+for (const [a, b] of sc.breaths) for (const bus of [drums, claps, harm, lead, chorus, hall, echo]) MIX.gate(bus, a, b, 0.006); // the held breaths
 const mix = MIX.mixdown(stems, GAIN, { stemDir: process.env.STEMS ? path.join(__dirname, 'out') : null });
 MIX.highpass(mix, 28);
 MIX.fadeOut(mix, DURATION - 1.2, DURATION);

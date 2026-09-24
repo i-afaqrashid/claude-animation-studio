@@ -7,12 +7,12 @@ Everything here runs from the project folder: `node engine/render.js <command>`.
 1. `brand-from https://site` → `brand.json` (colours, fonts from Google Fonts, logo, CTA). Check it, add `tone` and `claims`.
 2. Write the score, then `plan` → `out/plan.md`: the bar map, every on-screen word as a checklist of claims, the cast. The user approves it.
 3. Write song.js and film.js. Iterate with `preview` (live reload), `stills`, `board`, `cast`, and `--draft` renders.
-4. `qa` (every drawn word: safe area, size, overlap, contrast) and `pacing` (the hook and the cuts) on a draft or the final file.
+4. `qa` (the text in sampled frames: safe area, size, overlap, contrast) and `pacing` (the hook and the cuts) on a draft or the final file.
 5. `video` → `mux` → `verify` → `check`. Then `srt`, `poster` and `formats` for publishing.
 
 ## Captions and subtitles (`engine/subs.js`)
 Most people watch muted and platforms read caption text for search, so give every film subtitles.
-- score.js: `subtitles: [{ t, end, text, alt?, words?: [{ w, t }] }]`. `alt` is a second-language line (e.g. Urdu) drawn under the first. `words` holds exact word times (the voiceover writes them); without it, the line's time is shared by word length.
+- score.js: `subtitles: [{ t, end, text, alt?, words?: [{ w, t }] }]`. `alt` is a second-language line (e.g. Urdu) drawn under the first. `words` holds word times (the voiceover writes its estimates); without it, the line's time is shared by word length.
 - film.js, drawn last in `draw()`: `Subs.draw(ctx, t, SCORE.subtitles, { style })`.
   - `pop`: words appear as they are said, the current word yellow (TikTok style).
   - `karaoke`: the whole line, with a box on the current word.
@@ -22,7 +22,7 @@ Most people watch muted and platforms read caption text for search, so give ever
 - `render.js srt` writes `out/<name>.srt` + `.vtt`, taken from out/voice.json, else `subtitles`, else `captions`. `render.js mux --subs` adds a soft subtitle track.
 
 ## Voiceover, singing and your own song
-- **Voiceover:** `Voice.speak([...])` in song.js. It writes `out/voice.json` with the lines, word times and a mouth track, and the music ducks under the voice. `Subs.fromVoice(VO)` gives word-exact captions, and `Subs.mouth(VO, t, who)` gives lip-sync. See music-cookbook.md.
+- **Voiceover:** `Voice.speak([...])` in song.js. It writes `out/voice.json` with the lines, word times and a mouth track, and the music ducks under the voice. `Subs.fromVoice(VO)` gives captions timed to each word (estimated), and `Subs.mouth(VO, t, who)` gives lip-sync. See music-cookbook.md.
 - **Sung jingles:** `Sing.line('si-tey dot pee-kay', notes)` sings a brand name, and `Sing.happyBirthday(name)` a birthday song.
 - **Your own song:** `render.js analyze song.mp3 [--lrc song.lrc]` writes `beats.js` (tempo, beats, bars, sections, lyrics). Build the clock on it with `makeClock({ beats })`, then use `MIX.loadAudio` for the soundtrack.
 
@@ -31,7 +31,7 @@ Measured on the rendered file:
 - first movement ≤ 1s,
 - first sound ≤ 1s,
 - ≥ 2 hits in the first 3s,
-- on-screen text ≤ 3s (the text probe sees every drawn word),
+- on-screen text ≤ 3s (the text probe sees every word drawn in the frames it samples),
 - no stretch longer than 12s without a cut or big change,
 - an intro not more than 12 dB quieter than the film.
 

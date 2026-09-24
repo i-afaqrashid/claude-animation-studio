@@ -2,7 +2,7 @@
 // Many people watch muted, and platforms read caption text for search, so every film should have them.
 //
 // score.js:  subtitles: [{ t, end, text, alt?, words?: [{ w, t }] }]
-//   - words (optional): exact word times (the voiceover writes them into out/voice.json); otherwise the
+//   - words (optional): word times (the voiceover writes its estimates into out/voice.json); otherwise the
 //     line's time is shared out by word length.  alt: a second language line (e.g. Urdu) drawn under it.
 // film.js:   Subs.draw(ctx, t, SCORE.subtitles, { style: 'pop' | 'karaoke' | 'box' | 'clean' })
 // Node:      render.js srt  -> out/<name>.srt + .vtt ;  render.js mux --subs adds a soft subtitle track
@@ -21,7 +21,7 @@
   };
   // subtitles from the film's own caption list (a fallback when no subtitles were written)
   Subs.fromCaptions = (captions) => (captions || []).filter((c) => c.text).map((c) => ({ t: c.t, end: c.end, text: c.text }));
-  // subtitles from the voiceover (out/voice.json, loaded with Studio.loadJSON): exact word times, long
+  // subtitles from the voiceover (out/voice.json, loaded with Studio.loadJSON): its estimated word times, long
   // lines split into chunks of at most `maxWords` (breaking after punctuation when it can), each held
   // `hold` seconds after its last word (but never over the next chunk)
   Subs.fromVoice = (vo, { maxWords = 7, hold = 0.5 } = {}) => {

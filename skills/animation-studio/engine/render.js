@@ -7,7 +7,7 @@
 //   node engine/render.js video [workers]        -> out/video.mp4 (silent, parallel Chrome workers)
 //   node engine/render.js mux [name]             -> out/<name>.mp4 (video + out/music.wav, shareable H.264/AAC)
 //   node engine/render.js check [name]           -> out/check-sheet.png + loudness report of the final file
-//   node engine/render.js verify [name]          -> measures sound + picture at every sync marker of the final file
+//   node engine/render.js verify [name]          -> measures sound + picture at every sync marker of the final file (unclear = fail; --allow-unclear)
 //   node engine/render.js preview [t]            -> live preview WITH SOUND in your browser (local page, random port)
 //   node engine/render.js cast                   -> out/cast.png: every character × 6 expressions/poses (audition sheet)
 //   node engine/render.js analyze song.mp3        -> tempo, beats, bars, sections, lyrics of your own song (beats.js)
@@ -419,7 +419,10 @@ const CAST_JS = `(() => {
 // Reads the FINAL file (what viewers get): decodes the picture at 96x54 grey and the sound as mono.
 // Picture: the frame with the biggest change near the marker (a cut, flash, stamp, pop…) must be the
 // first frame at/after the marker (±1 frame). Sound: the steepest level rise must be within ±20 ms.
-function verify(file) {
+// A measurement is "unclear" (?) when nothing distinct happens there, or when two onsets are nearly as
+// steep as each other and far apart (a sung pickup just before a sung downbeat): the file cannot tell
+// which one the marker means. Unclear measurements FAIL unless --allow-unclear is given.
+function verify(file, { allowUnclear = false } = {}) {
   const VW = PORTRAIT ? 2 * Math.round((48 * FW) / FH) : 96, VH = PORTRAIT ? 96 : 2 * Math.round((48 * FH) / FW), FS = VW * VH, AR = 48000;
   const synced = Object.entries(MARKERS).filter(([, mk]) => typeof mk === 'object' && mk.sync);
   if (!synced.length) {
@@ -463,18 +466,24 @@ function verify(file) {
       for (let i = s; i < s + win; i++) e += aud[i] * aud[i];
       db.push([s, 10 * Math.log10(e / win + 1e-12)]);
     }
-    let best = null;
+    const cands = [];
     for (let k = 4; k < db.length; k++) {
       const before = Math.min(db[k - 4][1], db[k - 3][1], db[k - 2][1], db[k - 1][1]);
-      const rise = db[k][1] - before;
-      if (db[k][1] > -50 && (!best || rise > best.rise)) best = { t: db[k][0] / AR, rise };
+      if (db[k][1] > -50) cands.push({ t: db[k][0] / AR, rise: db[k][1] - before });
     }
-    return best && { t: best.t, clear: best.rise >= 6 };
+    if (!cands.length) return null;
+    cands.sort((a, b) => b.rise - a.rise);
+    const best = cands[0];
+    // the strongest onset elsewhere (more than 40 ms away): if it is almost as steep, the call is a coin toss
+    const rival = cands.find((c) => Math.abs(c.t - best.t) > 0.04);
+    const ambiguous = rival && rival.rise >= best.rise - 1 ? rival : null;
+    return { t: best.t, clear: best.rise >= 6 && !ambiguous, rival: ambiguous };
   }
   const tol = 0.02;
   console.log(`verify ${path.relative(ROOT, file)}${aud && audioSrc !== file ? ' + out/music.wav' : ''}   (sound within ±${tol * 1000} ms, picture within ±1 frame)`);
   console.log('marker'.padEnd(14) + 'score'.padEnd(11) + 'sound'.padEnd(22) + 'picture');
   let bad = 0, unclear = 0;
+  const notes = [];
   for (const [name, mk] of synced) {
     const t = mk.t;
     let line = name.padEnd(14) + `${t.toFixed(3)}s`.padEnd(11);
@@ -486,6 +495,7 @@ function verify(file) {
         const mark = !a.clear ? '?' : ok ? '✓' : '✗';
         if (mark === '✗') bad++; if (mark === '?') unclear++;
         line += `${a.t.toFixed(3)}s ${d >= 0 ? '+' : ''}${d}ms ${mark}`.padEnd(22);
+        if (a.rival) notes.push(`${name}: two onsets are almost equally steep, at ${a.t.toFixed(3)}s and ${a.rival.t.toFixed(3)}s. Put the marker on a real hit (a drum, a pop) or drop its 'a'`);
       }
     } else line += '—'.padEnd(22);
     if (/v/.test(mk.sync)) {
@@ -496,9 +506,11 @@ function verify(file) {
     } else line += '—';
     console.log(line);
   }
-  console.log(bad ? `✗ ${bad} measurement(s) out of sync: move the late side in score.js (never nudge one side by hand)`
-    : `✓ in sync${unclear ? ` (${unclear} unclear: no distinct hit near that marker; make the moment a clear cut/flash/pop and a clear sound, or drop its sync flag)` : ''}`);
-  return bad === 0;
+  for (const n of notes) console.log(`  ? ${n}`);
+  if (bad) console.log(`✗ ${bad} measurement(s) out of sync: move the late side in score.js (never nudge one side by hand)`);
+  else if (unclear && !allowUnclear) console.log(`? ${unclear} measurement(s) unclear, so sync is NOT proven there: make each such moment a clear cut/flash/pop with a clear sound, or drop its sync flag (--allow-unclear accepts them as warnings)`);
+  else console.log(`✓ in sync${unclear ? ` (${unclear} unclear, accepted with --allow-unclear)` : ''}`);
+  return bad === 0 && (unclear === 0 || allowUnclear);
 }
 
 // modes that live in engine/tools/<file>.js (each gets the context object below)
@@ -521,7 +533,7 @@ async function main() {
     if (mode === 'verify') {
       if (!fs.existsSync(file) && !nameArg) file = VIDEO;
       if (!fs.existsSync(file)) throw new Error(`${file} not found: render (and mux) first`);
-      if (!verify(file)) process.exitCode = 1;
+      if (!verify(file, { allowUnclear: args.includes('--allow-unclear') })) process.exitCode = 1;
       return;
     }
     if (mode === 'mux') {

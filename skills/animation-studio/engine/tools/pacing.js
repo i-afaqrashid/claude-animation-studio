@@ -8,7 +8,7 @@ module.exports = async function pacing(C, _mode, args) {
   let file = C.finalName(nameArg);
   if (!fs.existsSync(file)) file = C.VIDEO;
   if (!fs.existsSync(file)) throw new Error('render (and mux) the film first');
-  // what text is really on screen in the first seconds (the probe sees every drawn word, not just captions)
+  // what text is really on screen in the first seconds (the probe sees every word drawn in the frames it samples, not just captions)
   let probed = [];
   try {
     await C.serve();

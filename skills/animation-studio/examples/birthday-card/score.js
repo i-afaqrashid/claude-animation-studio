@@ -42,7 +42,9 @@
   };
   const DURATION = ev.blow + 3.2;
   const S = { intro: [0, notes[0].t], song: [notes[0].t, ev.blow], blow: [ev.blow, DURATION] };
-  const markers = { first: { t: notes[2].t, sync: 'a' }, dear: { t: ev.dear, sync: 'a' }, blow: { t: ev.blow, sync: 'av' } };
+  // `first` is a name only: a sung downbeat right after the sung pickup "hap-py" has no single sharp onset,
+  // so it cannot be measured reliably (verify reports such markers as unclear). The blow is the real hit.
+  const markers = { first: notes[2].t, dear: { t: ev.dear, sync: 'a' }, blow: { t: ev.blow, sync: 'av' } };
   const l4 = 17 + Math.max(2, nameSyl.length); // where the last line starts
   const subtitles = [
     { t: notes[0].t, end: notes[6].t - 0.05, text: 'Happy birthday to you' },

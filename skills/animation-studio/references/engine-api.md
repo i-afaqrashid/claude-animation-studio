@@ -76,7 +76,7 @@ Crisp app UI (system font) for promos; every call is a pure function of its argu
 `node new-project.js <dir> [--format 16:9|9:16|1:1|4:5] [--from app-promo|world-cup-2026]`. `--format` rewrites `const FORMAT` in the new score.js (the template and app-promo lay themselves out from it).
 
 ## subs.js (`Subs`, Node + browser)
-`Subs.draw(ctx, t, subtitles, {style: 'pop'|'karaoke'|'box'|'clean', size, y, x, color, highlight, fam, maxW})` · `Subs.words(line)` → word timings · `Subs.toSRT(subs)` · `Subs.toVTT(subs)` · `Subs.fromCaptions(captions)` · `Subs.fromVoice(voiceJson, {maxWords=7, hold=0.5})` → subtitles with exact word times · `Subs.mouth(voiceJson, t, who)` → `{open, wide, talking}` for lip-sync.
+`Subs.draw(ctx, t, subtitles, {style: 'pop'|'karaoke'|'box'|'clean', size, y, x, color, highlight, fam, maxW})` · `Subs.words(line)` → word timings · `Subs.toSRT(subs)` · `Subs.toVTT(subs)` · `Subs.fromCaptions(captions)` · `Subs.fromVoice(voiceJson, {maxWords=7, hold=0.5})` → subtitles with the voiceover's (estimated) word times · `Subs.mouth(voiceJson, t, who)` → `{open, wide, talking}` for lip-sync.
 
 ## video/shots.js (`Shots`)
 `Shots.film([{ at, draw(ctx, t, s), in: 'cut'|'fade'|'dip'|'iris'|'irisIn'|'wipe'|'push'|'whip'|'zoom'|'flash'|'paper' or {type, dur, dir, color, at: [x, y], text}, cam: fn(s) | {x, y, zoom, rot} }], {end})` → draw function (`s = {t0, t1, u, dt, cam}`) · cameras `Shots.push(z0, z1)`, `pan(x0, x1, y0, y1)`, `shake(amp, from, decay)`, `handheld(amp)`, `combine(...)` · `Shots.cam(ctx, cam)` · `Shots.layers(ctx, cam, [{depth, draw}])` parallax.
